@@ -13,12 +13,13 @@ type Movie = {
   color?: string;
   rating?: number;
   blurb?: string;
-  posters?: string[];
+  reviewText?: string;
+  poster?: string;
 };
 
 type Leader = Movie & { votes: number };
 
-const reviews: Movie[] = [
+const fallbackReviews: Movie[] = [
   {
     id: "review-mickey17",
     title: "Mickey 17",
@@ -28,7 +29,7 @@ const reviews: Movie[] = [
     color: "#d34d36",
     rating: 8.2,
     blurb: "Robert Pattinson dies for a living. Somehow, the paperwork is the scariest part.",
-    posters: ["/posters/mickey-1.jpg", "/posters/mickey-2.jpg", "/posters/mickey-3.jpg"],
+    poster: "/posters/mickey-1.jpg",
   },
   {
     id: "review-conclave",
@@ -39,7 +40,7 @@ const reviews: Movie[] = [
     color: "#3b55a3",
     rating: 8.8,
     blurb: "Like a group chat with better robes, higher stakes, and Ralph Fiennes.",
-    posters: ["/posters/conclave-1.jpg", "/posters/conclave-2.jpg", "/posters/conclave-3.jpg"],
+    poster: "/posters/conclave-2.jpg",
   },
   {
     id: "review-companion",
@@ -50,7 +51,7 @@ const reviews: Movie[] = [
     color: "#9c4167",
     rating: 7.7,
     blurb: "A terrible couples weekend. Great for everyone who did not attend it.",
-    posters: ["/posters/companion-1.jpg", "/posters/companion-2.jpg", "/posters/companion-3.jpg"],
+    poster: "/posters/companion-3.jpg",
   },
 ];
 
@@ -77,8 +78,8 @@ const fallbackLeaders: Leader[] = [
   { id: "Q63985561", title: "The Substance", year: "2024", votes: 19 },
 ];
 
-function Poster({ movie, compact = false, choice = 0 }: { movie: Movie; compact?: boolean; choice?: number }) {
-  const artwork = movie.posters?.[choice] ?? movie.posters?.[0];
+function Poster({ movie, compact = false }: { movie: Movie; compact?: boolean }) {
+  const artwork = movie.poster;
   return (
     <div className={`poster ${compact ? "poster--compact" : ""} ${artwork ? "poster--art" : ""}`} style={{ "--poster": movie.color ?? "#3d7654" } as CSSProperties}>
       {artwork && <img src={artwork} alt={`Original poster artwork for ${movie.title}`} />}
@@ -102,6 +103,7 @@ function WatchLinks({ movie, compact = false }: { movie: Movie; compact?: boolea
 }
 
 export default function Home() {
+  const [reviews, setReviews] = useState<Movie[]>(fallbackReviews);
   const [leaders, setLeaders] = useState<Leader[]>(fallbackLeaders);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Movie[]>([]);
@@ -115,8 +117,6 @@ export default function Home() {
   const [runtime, setRuntime] = useState("any");
   const [vibe, setVibe] = useState("easy");
   const [recommendations, setRecommendations] = useState<Movie[]>([]);
-  const [posterChoices, setPosterChoices] = useState<Record<string, number>>({});
-  const [posterPicker, setPosterPicker] = useState<Movie | null>(null);
 
   useEffect(() => {
     fetch("/api/community")
@@ -126,39 +126,20 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem("wrd-poster-choices");
-      if (saved) setPosterChoices(JSON.parse(saved));
-    } catch {
-      // Poster preferences are a nice-to-have, so storage failures stay quiet.
-    }
+    fetch("/api/reviews")
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((data) => {
+        if (!data.reviews?.length) return;
+        const published = data.reviews as Movie[];
+        const publishedTitles = new Set(published.map((movie) => movie.title.toLowerCase()));
+        setReviews([...published, ...fallbackReviews.filter((movie) => !publishedTitles.has(movie.title.toLowerCase()))]);
+      })
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
-    if (!posterPicker) return;
-    const closeOnEscape = (event: KeyboardEvent) => event.key === "Escape" && setPosterPicker(null);
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [posterPicker]);
-
-  function choosePoster(movie: Movie, choice: number) {
-    const next = { ...posterChoices, [movie.id]: choice };
-    setPosterChoices(next);
-    try {
-      window.localStorage.setItem("wrd-poster-choices", JSON.stringify(next));
-    } catch {
-      // The selected poster still works for this visit.
-    }
-    setPosterPicker(null);
-  }
-
-  useEffect(() => {
     if (selected && query === selected.title) return;
-    setSelected(null);
-    if (query.trim().length < 2) {
-      setResults([]);
-      return;
-    }
+    if (query.trim().length < 2) return;
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       setSearching(true);
@@ -259,8 +240,7 @@ export default function Home() {
         </div>
         <div className="hero__feature">
           <span className="feature__tag">Will’s pick of the week</span>
-          <Poster movie={reviews[0]} choice={posterChoices[reviews[0].id] ?? 0} />
-          <button className="poster-pick-button feature__picker" type="button" onClick={() => setPosterPicker(reviews[0])}><span>▦</span> Pick this poster</button>
+          <Poster movie={reviews[0]} />
           <div className="feature__score">
             <span>The Will-o-Meter™</span>
             <strong>{reviews[0].rating}<small>/10</small></strong>
@@ -282,15 +262,15 @@ export default function Home() {
           {reviews.map((movie, index) => (
             <article className="review-card" key={movie.id}>
               <div className="review-card__poster">
-                <Poster movie={movie} choice={posterChoices[movie.id] ?? 0} />
-                <button className="poster-pick-button" type="button" onClick={() => setPosterPicker(movie)}><span>▦</span> Choose poster</button>
-                <span className="card-number">0{index + 1}</span>
+                <Poster movie={movie} />
+                <span className="card-number">{String(index + 1).padStart(2, "0")}</span>
               </div>
               <div className="review-card__body">
                 <div className="review-card__meta"><span>{movie.genre}</span><span>{movie.runtime} min</span></div>
                 <h3>{movie.title}</h3>
                 <p>“{movie.blurb}”</p>
                 <div className="mini-score"><span>Will-o-Meter</span><strong>{movie.rating}</strong><i style={{ width: `${(movie.rating ?? 0) * 10}%` }} /></div>
+                {movie.reviewText && <details className="full-take"><summary>Read Will&apos;s full take</summary><p>{movie.reviewText}</p></details>}
                 <WatchLinks movie={movie} compact />
               </div>
             </article>
@@ -370,7 +350,12 @@ export default function Home() {
             <label htmlFor="movie-search">Find a movie</label>
             <div className="movie-search">
               <span>⌕</span>
-              <input id="movie-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Start typing a movie title…" autoComplete="off" />
+              <input id="movie-search" value={query} onChange={(event) => {
+                const nextQuery = event.target.value;
+                setQuery(nextQuery);
+                if (selected && nextQuery !== selected.title) setSelected(null);
+                if (nextQuery.trim().length < 2) setResults([]);
+              }} placeholder="Start typing a movie title…" autoComplete="off" />
               {searching && <i>Searching…</i>}
             </div>
             {results.length > 0 && !selected && (
@@ -427,24 +412,6 @@ export default function Home() {
         <span className="footer-wink">ROLL CREDITS →</span>
       </footer>
 
-      {posterPicker && posterPicker.posters && (
-        <div className="poster-picker" role="dialog" aria-modal="true" aria-labelledby="poster-picker-title" onMouseDown={(event) => event.target === event.currentTarget && setPosterPicker(null)}>
-          <div className="poster-picker__panel">
-            <div className="poster-picker__heading">
-              <div><p className="kicker">Make the marquee yours</p><h2 id="poster-picker-title">Pick a poster for <em>{posterPicker.title}</em></h2></div>
-              <button type="button" onClick={() => setPosterPicker(null)} aria-label="Close poster picker">×</button>
-            </div>
-            <div className="poster-picker__grid">
-              {posterPicker.posters.map((poster, index) => (
-                <button className={(posterChoices[posterPicker.id] ?? 0) === index ? "active" : ""} type="button" onClick={() => choosePoster(posterPicker, index)} key={poster}>
-                  <span className="poster-picker__art"><img src={poster} alt={`${posterPicker.title} poster option ${index + 1}`} /><i>{(posterChoices[posterPicker.id] ?? 0) === index ? "✓ Selected" : `Option ${index + 1}`}</i></span>
-                </button>
-              ))}
-            </div>
-            <p className="poster-picker__note">Original alternate art made for Will's Reel Deal. Your pick is remembered on this device.</p>
-          </div>
-        </div>
-      )}
     </main>
   );
 }
