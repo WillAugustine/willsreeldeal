@@ -13,6 +13,7 @@ type Movie = {
   color?: string;
   rating?: number;
   blurb?: string;
+  posters?: string[];
 };
 
 type Leader = Movie & { votes: number };
@@ -27,6 +28,7 @@ const reviews: Movie[] = [
     color: "#d34d36",
     rating: 8.2,
     blurb: "Robert Pattinson dies for a living. Somehow, the paperwork is the scariest part.",
+    posters: ["/posters/mickey-1.jpg", "/posters/mickey-2.jpg", "/posters/mickey-3.jpg"],
   },
   {
     id: "review-conclave",
@@ -37,6 +39,7 @@ const reviews: Movie[] = [
     color: "#3b55a3",
     rating: 8.8,
     blurb: "Like a group chat with better robes, higher stakes, and Ralph Fiennes.",
+    posters: ["/posters/conclave-1.jpg", "/posters/conclave-2.jpg", "/posters/conclave-3.jpg"],
   },
   {
     id: "review-companion",
@@ -47,6 +50,7 @@ const reviews: Movie[] = [
     color: "#9c4167",
     rating: 7.7,
     blurb: "A terrible couples weekend. Great for everyone who did not attend it.",
+    posters: ["/posters/companion-1.jpg", "/posters/companion-2.jpg", "/posters/companion-3.jpg"],
   },
 ];
 
@@ -73,9 +77,11 @@ const fallbackLeaders: Leader[] = [
   { id: "Q63985561", title: "The Substance", year: "2024", votes: 19 },
 ];
 
-function Poster({ movie, compact = false }: { movie: Movie; compact?: boolean }) {
+function Poster({ movie, compact = false, choice = 0 }: { movie: Movie; compact?: boolean; choice?: number }) {
+  const artwork = movie.posters?.[choice] ?? movie.posters?.[0];
   return (
-    <div className={`poster ${compact ? "poster--compact" : ""}`} style={{ "--poster": movie.color ?? "#3d7654" } as CSSProperties}>
+    <div className={`poster ${compact ? "poster--compact" : ""} ${artwork ? "poster--art" : ""}`} style={{ "--poster": movie.color ?? "#3d7654" } as CSSProperties}>
+      {artwork && <img src={artwork} alt={`Original poster artwork for ${movie.title}`} />}
       <div className="poster__grain" />
       <span className="poster__year">{movie.year}</span>
       <span className="poster__mark">WRD</span>
@@ -109,6 +115,8 @@ export default function Home() {
   const [runtime, setRuntime] = useState("any");
   const [vibe, setVibe] = useState("easy");
   const [recommendations, setRecommendations] = useState<Movie[]>([]);
+  const [posterChoices, setPosterChoices] = useState<Record<string, number>>({});
+  const [posterPicker, setPosterPicker] = useState<Movie | null>(null);
 
   useEffect(() => {
     fetch("/api/community")
@@ -116,6 +124,33 @@ export default function Home() {
       .then((data) => data.leaders?.length && setLeaders(data.leaders))
       .catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("wrd-poster-choices");
+      if (saved) setPosterChoices(JSON.parse(saved));
+    } catch {
+      // Poster preferences are a nice-to-have, so storage failures stay quiet.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!posterPicker) return;
+    const closeOnEscape = (event: KeyboardEvent) => event.key === "Escape" && setPosterPicker(null);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [posterPicker]);
+
+  function choosePoster(movie: Movie, choice: number) {
+    const next = { ...posterChoices, [movie.id]: choice };
+    setPosterChoices(next);
+    try {
+      window.localStorage.setItem("wrd-poster-choices", JSON.stringify(next));
+    } catch {
+      // The selected poster still works for this visit.
+    }
+    setPosterPicker(null);
+  }
 
   useEffect(() => {
     if (selected && query === selected.title) return;
@@ -224,7 +259,8 @@ export default function Home() {
         </div>
         <div className="hero__feature">
           <span className="feature__tag">Will’s pick of the week</span>
-          <Poster movie={reviews[0]} />
+          <Poster movie={reviews[0]} choice={posterChoices[reviews[0].id] ?? 0} />
+          <button className="poster-pick-button feature__picker" type="button" onClick={() => setPosterPicker(reviews[0])}><span>▦</span> Pick this poster</button>
           <div className="feature__score">
             <span>The Will-o-Meter™</span>
             <strong>{reviews[0].rating}<small>/10</small></strong>
@@ -245,7 +281,11 @@ export default function Home() {
         <div className="review-grid">
           {reviews.map((movie, index) => (
             <article className="review-card" key={movie.id}>
-              <div className="review-card__poster"><Poster movie={movie} /><span className="card-number">0{index + 1}</span></div>
+              <div className="review-card__poster">
+                <Poster movie={movie} choice={posterChoices[movie.id] ?? 0} />
+                <button className="poster-pick-button" type="button" onClick={() => setPosterPicker(movie)}><span>▦</span> Choose poster</button>
+                <span className="card-number">0{index + 1}</span>
+              </div>
               <div className="review-card__body">
                 <div className="review-card__meta"><span>{movie.genre}</span><span>{movie.runtime} min</span></div>
                 <h3>{movie.title}</h3>
@@ -263,7 +303,7 @@ export default function Home() {
         <div className="manifesto__grid">
           <h2>I rate the stuff you actually argue about on the drive home.</h2>
           <div className="score-list">
-            <p><span>01</span><strong>Did the plot plot?</strong><small>Could I follow it—and did I care?</small></p>
+            <p><span>01</span><strong>Did the plot plot?</strong><small>Could I follow it - and did I care?</small></p>
             <p><span>02</span><strong>Did the acting act?</strong><small>Did I believe these beautiful strangers?</small></p>
             <p><span>03</span><strong>Was the cool stuff cool?</strong><small>Monsters, car chases, costumes, general razzle-dazzle.</small></p>
             <p><span>04</span><strong>Would I run it back?</strong><small>The couch-test that separates good from great.</small></p>
@@ -367,7 +407,7 @@ export default function Home() {
         <div className="newsletter__copy">
           <p className="kicker">Will’s inbox-friendly movie dispatch</p>
           <h2>Good takes. Bad puns.<br />Delivered responsibly.</h2>
-          <p>Choose your preferred level of Will in your inbox. Unsubscribe whenever—the theater doors are never locked.</p>
+          <p>Choose your preferred level of Will in your inbox. Unsubscribe whenever - the theater doors are never locked.</p>
         </div>
         <form onSubmit={submitNewsletter}>
           <div className="frequency-options">
@@ -386,6 +426,25 @@ export default function Home() {
         <p className="affiliate-note" id="affiliate-note"><strong>Keeping the lights dim:</strong> Amazon and Apple links may become affiliate links once Will is approved for their programs. A qualifying purchase may earn a commission at no added cost to you. Netflix currently offers no public affiliate program, so that button is just neighborly.</p>
         <span className="footer-wink">ROLL CREDITS →</span>
       </footer>
+
+      {posterPicker && posterPicker.posters && (
+        <div className="poster-picker" role="dialog" aria-modal="true" aria-labelledby="poster-picker-title" onMouseDown={(event) => event.target === event.currentTarget && setPosterPicker(null)}>
+          <div className="poster-picker__panel">
+            <div className="poster-picker__heading">
+              <div><p className="kicker">Make the marquee yours</p><h2 id="poster-picker-title">Pick a poster for <em>{posterPicker.title}</em></h2></div>
+              <button type="button" onClick={() => setPosterPicker(null)} aria-label="Close poster picker">×</button>
+            </div>
+            <div className="poster-picker__grid">
+              {posterPicker.posters.map((poster, index) => (
+                <button className={(posterChoices[posterPicker.id] ?? 0) === index ? "active" : ""} type="button" onClick={() => choosePoster(posterPicker, index)} key={poster}>
+                  <span className="poster-picker__art"><img src={poster} alt={`${posterPicker.title} poster option ${index + 1}`} /><i>{(posterChoices[posterPicker.id] ?? 0) === index ? "✓ Selected" : `Option ${index + 1}`}</i></span>
+                </button>
+              ))}
+            </div>
+            <p className="poster-picker__note">Original alternate art made for Will's Reel Deal. Your pick is remembered on this device.</p>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

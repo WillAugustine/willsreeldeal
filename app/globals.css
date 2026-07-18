@@ -54,18 +54,22 @@ main { overflow: hidden; }
 .hero__proof p { margin: 0; border-left: 1px solid var(--line); padding-left: 18px; font-size: 11px; line-height: 1.45; text-transform: uppercase; letter-spacing: .08em; color: rgba(244,240,223,.65); }
 .hero__feature { background: var(--cream); color: var(--ink); padding: 15px; position: relative; transform: rotate(1.5deg); box-shadow: 22px 24px 0 rgba(2,21,13,.45); }
 .feature__tag { position: absolute; z-index: 3; right: -28px; top: 35px; background: var(--orange); color: white; padding: 12px 14px; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; transform: rotate(5deg); }
-.hero__feature > .poster { height: 355px; }
+.hero__feature > .poster { height: auto; aspect-ratio: 2 / 3; max-height: 500px; }
 .feature__score { display: flex; align-items: end; justify-content: space-between; padding: 15px 4px 6px; border-bottom: 1px solid rgba(16,40,28,.2); }
 .feature__score span { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .13em; }
 .feature__score strong { font: 800 44px/1 Georgia, serif; letter-spacing: -.05em; }
 .feature__score small { font: 700 13px/1 Arial, sans-serif; }
 .hero__feature > p { margin: 15px 4px; font: italic 16px/1.4 Georgia, serif; }
+.feature__picker { top: 30px; left: 30px; right: auto; bottom: auto; transform: rotate(-2deg); }
 .ticker { position: absolute; bottom: 0; left: 0; right: 0; min-height: 50px; background: var(--lime); color: var(--forest-dark); display: flex; justify-content: space-around; align-items: center; gap: 30px; font-size: 10px; font-weight: 900; letter-spacing: .14em; white-space: nowrap; transform: rotate(-.5deg) scale(1.01); }
 
 .poster { height: 300px; background: var(--poster); color: white; padding: 18px; display: flex; flex-direction: column; justify-content: flex-end; position: relative; overflow: hidden; isolation: isolate; }
 .poster::before { content: ""; position: absolute; inset: -25%; background: radial-gradient(circle at 70% 20%, rgba(255,255,255,.38), transparent 22%), linear-gradient(135deg, transparent 20%, rgba(0,0,0,.35) 20% 45%, transparent 45%), repeating-linear-gradient(75deg, transparent 0 28px, rgba(255,255,255,.06) 28px 29px); transform: rotate(-8deg); z-index: -1; }
+.poster--art::before { display: none; }
+.poster--art::after { content: ""; position: absolute; inset: 35% 0 0; background: linear-gradient(transparent, rgba(4,19,12,.88)); z-index: -1; }
+.poster > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; }
 .poster__grain { position: absolute; inset: 0; opacity: .24; background: repeating-radial-gradient(circle at 30% 20%, rgba(255,255,255,.22) 0 1px, transparent 1px 4px); mix-blend-mode: soft-light; }
-.poster strong { font: 800 clamp(28px, 3vw, 54px)/.88 Georgia, serif; letter-spacing: -.05em; max-width: 90%; position: relative; }
+.poster strong { font: 800 clamp(28px, 3vw, 54px)/.88 Georgia, serif; letter-spacing: -.05em; max-width: 90%; position: relative; z-index: 1; text-shadow: 0 2px 18px rgba(0,0,0,.45); }
 .poster__year, .poster__mark { position: absolute; top: 17px; font-size: 9px; font-weight: 900; letter-spacing: .15em; }
 .poster__year { left: 18px; }
 .poster__mark { right: 18px; border: 1px solid currentColor; border-radius: 50%; padding: 6px 4px; }
@@ -73,6 +77,10 @@ main { overflow: hidden; }
 .poster--compact strong { font-size: 13px; line-height: .92; }
 .poster--compact .poster__year { top: 8px; left: 8px; font-size: 7px; }
 .poster--compact .poster__mark { display: none; }
+.poster--compact.poster--art strong { font-size: 11px; }
+.poster-pick-button { position: absolute; z-index: 4; left: 22px; bottom: 18px; border: 1px solid rgba(244,240,223,.75); background: rgba(6,39,26,.88); color: var(--cream); padding: 9px 11px; cursor: pointer; font-size: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: .09em; backdrop-filter: blur(8px); }
+.poster-pick-button:hover { background: var(--lime); color: var(--forest-dark); border-color: var(--lime); }
+.poster-pick-button span { font-size: 12px; margin-right: 5px; }
 
 .watch-links { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
 .watch-links a { min-height: 38px; padding: 0 10px; background: var(--forest); color: var(--cream); display: flex; align-items: center; justify-content: space-between; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
@@ -90,6 +98,7 @@ main { overflow: hidden; }
 .review-card { border: 1px solid rgba(16,40,28,.2); background: rgba(255,255,255,.2); transition: transform .25s, box-shadow .25s; }
 .review-card:hover { transform: translateY(-8px); box-shadow: 0 18px 35px rgba(11,59,39,.12); }
 .review-card__poster { position: relative; padding: 9px 9px 0; }
+.review-card__poster > .poster { height: auto; aspect-ratio: 2 / 3; }
 .card-number { position: absolute; bottom: -19px; right: 22px; width: 48px; height: 48px; background: var(--lime); border: 1px solid var(--ink); border-radius: 50%; display: grid; place-items: center; font: 800 16px Georgia, serif; }
 .review-card__body { padding: 28px 20px 20px; }
 .review-card__meta { display: flex; justify-content: space-between; color: #557060; text-transform: uppercase; letter-spacing: .1em; font-size: 8px; font-weight: 800; }
@@ -195,6 +204,23 @@ footer > p { margin: 0; color: rgba(244,240,223,.53); font-size: 10px; line-heig
 .affiliate-note { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-top: 18px; max-width: 850px; text-transform: none; letter-spacing: 0; }
 .footer-wink { position: absolute; right: 30px; bottom: 25px; color: var(--lime); font-size: 9px; letter-spacing: .14em; }
 
+.poster-picker { position: fixed; inset: 0; z-index: 100; background: rgba(2,18,11,.88); backdrop-filter: blur(12px); display: grid; place-items: center; padding: 28px; overflow-y: auto; }
+.poster-picker__panel { width: min(960px, 100%); background: var(--cream); color: var(--ink); padding: 34px; box-shadow: 18px 18px 0 var(--lime); }
+.poster-picker__heading { display: flex; justify-content: space-between; align-items: start; gap: 28px; margin-bottom: 28px; }
+.poster-picker__heading .kicker { margin-bottom: 10px; }
+.poster-picker__heading h2 { margin: 0; font: 700 clamp(32px, 4vw, 52px)/.95 Georgia, serif; letter-spacing: -.05em; }
+.poster-picker__heading h2 em { color: var(--forest-mid); font-weight: 400; }
+.poster-picker__heading > button { width: 44px; height: 44px; flex: 0 0 auto; border: 1px solid var(--ink); background: transparent; cursor: pointer; font-size: 30px; line-height: 1; }
+.poster-picker__heading > button:hover { background: var(--orange); color: white; }
+.poster-picker__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.poster-picker__grid > button { border: 4px solid transparent; padding: 0; background: transparent; cursor: pointer; transition: transform .2s, border-color .2s; }
+.poster-picker__grid > button:hover { transform: translateY(-5px); }
+.poster-picker__grid > button.active { border-color: var(--forest); }
+.poster-picker__art { display: block; position: relative; aspect-ratio: 2 / 3; background: var(--forest); overflow: hidden; }
+.poster-picker__art img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.poster-picker__art i { position: absolute; left: 10px; bottom: 10px; background: var(--lime); color: var(--forest-dark); padding: 8px 10px; font-style: normal; font-size: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; }
+.poster-picker__note { margin: 18px 0 0; color: #5b7064; font: italic 13px/1.4 Georgia, serif; }
+
 @media (max-width: 1000px) {
   .site-header nav { display: none; }
   .hero { grid-template-columns: 1fr .65fr; gap: 35px; }
@@ -245,6 +271,11 @@ footer > p { margin: 0; color: rgba(244,240,223,.53); font-size: 10px; line-heig
   .email-row label { grid-column: auto; }
   footer { grid-template-columns: 1fr; padding: 55px 20px 100px; }
   .footer-wink { left: 20px; right: auto; }
+  .poster-picker { padding: 12px; place-items: start center; }
+  .poster-picker__panel { padding: 22px 14px; box-shadow: 8px 8px 0 var(--lime); }
+  .poster-picker__grid { gap: 7px; }
+  .poster-picker__grid > button { border-width: 2px; }
+  .poster-picker__art i { left: 5px; bottom: 5px; padding: 6px; font-size: 6px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
