@@ -1,98 +1,61 @@
-# vinext-starter
+# Will's Reel Deal
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+Will's Reel Deal is a playful, ad-light movie review site built with Next.js,
+Vinext, and Cloudflare Workers.
 
-## Prerequisites
+## What runs where
 
-- Node.js `>=22.13.0`
+- GitHub is the source of truth for the code.
+- Cloudflare Workers serves the website.
+- Cloudflare D1 stores reviews, newsletter signups, and movie requests.
+- Cloudflare R2 stores poster uploads.
+- Squarespace remains the domain registrar for `willsreeldeal.com`.
+- Cloudflare Access protects the private review studio at `/studio`.
 
-## Quick Start
+The public site does not depend on ChatGPT or OpenAI hosting.
+
+## Local development
+
+Requirements:
+
+- Node.js 22.13 or newer
+
+Install and run:
 
 ```bash
 npm install
 npm run dev
+```
+
+Useful commands:
+
+```bash
 npm run build
+npm test
+npm run lint
+npm run deploy
 ```
 
-This starter does not use `wrangler.jsonc`.
+Local development uses local D1 and R2 data under `.wrangler`. The studio is
+available locally without Cloudflare Access.
 
-## Included Shape
+## Cloudflare configuration
 
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
+`wrangler.jsonc` defines the Worker, D1 database, and R2 bucket bindings. The
+production Worker also needs a `STUDIO_OWNER_EMAIL` environment variable.
+Cloudflare Access must protect both `/studio` and `/studio/*`, allowing only the
+owner email.
 
-## Workspace Auth Headers
+Deployments are connected to the `WillAugustine/willsreeldeal` GitHub repository
+so a push to `main` can publish the latest verified version.
 
-OpenAI workspace sites can read the current user's email from
-`oai-authenticated-user-email`.
+## Publishing a review
 
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
+1. Open `https://willsreeldeal.com/studio`.
+2. Sign in through Cloudflare Access.
+3. Search for and select the movie.
+4. Add the genre, runtime, Will-o-Meter score, quick take, and full review.
+5. Upload a JPG, PNG, or WebP poster under 8 MB.
+6. Select `Publish the take`.
 
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
-```
-
-## Optional Dispatch-Owned ChatGPT Sign-In
-
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
-
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
-
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
-
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
-
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
-
-## Useful Commands
-
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
-- `npm run db:generate`: generate Drizzle migrations after schema changes
-
-## Learn More
-
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+The review appears on the homepage immediately.

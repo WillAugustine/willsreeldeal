@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "wills-reel-deal",
+  "account_id": "4e9622b2a59f8f4b2ed71ff21b280571",
+  "compatibility_date": "2026-07-21",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "./worker/index.ts",
+  "assets": {
+    "directory": "dist/client",
+    "not_found_handling": "none",
+    "binding": "ASSETS"
+  },
+  "images": { "binding": "IMAGES" },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "wills-reel-deal-db",
+      "database_id": "5cd122f6-2d9f-40a9-9ad2-5d8408c5af19",
+      "migrations_dir": "drizzle"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "POSTERS",
+      "bucket_name": "wills-reel-deal-posters"
+    }
+  ]
+}

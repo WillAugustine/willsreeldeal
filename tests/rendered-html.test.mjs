@@ -18,21 +18,25 @@ test("keeps poster selection inside Will's review studio", async () => {
   assert.match(home, /fetch\("\/api\/reviews"\)/);
   assert.match(studio, /type="file"/);
   assert.match(studio, /accept="image\/jpeg,image\/png,image\/webp"/);
-  assert.match(studio, /fetch\("\/api\/reviews", \{ method: "POST"/);
+  assert.match(studio, /fetch\("\/studio\/api\/reviews", \{ method: "POST"/);
 });
 
 test("configures persistent review records and poster storage", async () => {
-  const [schema, route, hosting] = await Promise.all([
+  const [schema, route, config, auth] = await Promise.all([
     source("db/schema.ts"),
-    source("app/api/reviews/route.ts"),
-    source(".openai/hosting.json"),
+    source("app/studio/api/reviews/route.ts"),
+    source("wrangler.jsonc"),
+    source("app/studio-auth.ts"),
   ]);
 
   assert.match(schema, /sqliteTable\("reviews"/);
-  assert.match(schema, /sqliteTable\("studio_owner"/);
   assert.match(route, /POSTERS\.put/);
   assert.match(route, /movieId.*title/s);
-  assert.equal(JSON.parse(hosting).r2, "POSTERS");
+  const wrangler = JSON.parse(config);
+  assert.equal(wrangler.d1_databases[0].binding, "DB");
+  assert.equal(wrangler.r2_buckets[0].binding, "POSTERS");
+  assert.match(auth, /cf-access-authenticated-user-email/);
+  assert.match(auth, /STUDIO_OWNER_EMAIL/);
 });
 
 test("contains no em dashes in visitor or studio copy", async () => {

@@ -55,7 +55,7 @@ export default function StudioForm() {
     form.set("year", selected.year);
 
     try {
-      const response = await fetch("/api/reviews", { method: "POST", body: form });
+      const response = await fetch("/studio/api/reviews", { method: "POST", body: form });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Publishing failed.");
       setMessage(`${selected.title} is live. Excellent work, boss.`);

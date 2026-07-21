@@ -1,4 +1,3 @@
-import { chatGPTSignOutPath } from "../chatgpt-auth";
 import { requireStudioOwner } from "../studio-auth";
 import StudioForm from "./StudioForm";
 import Link from "next/link";
@@ -18,7 +17,6 @@ export default async function StudioPage() {
         <div className="studio-header__actions">
           <span>Signed in as {owner.displayName}</span>
           <Link href="/">View site</Link>
-          {!owner.email.endsWith("@local.test") && <a href={chatGPTSignOutPath("/")}>Sign out</a>}
         </div>
       </header>
 
