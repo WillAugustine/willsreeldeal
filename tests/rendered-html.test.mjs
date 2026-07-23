@@ -45,7 +45,7 @@ test("contains no em dashes in visitor or studio copy", async () => {
     source("app/studio/page.tsx"),
     source("app/studio/StudioForm.tsx"),
   ]);
-  for (const file of files) assert.doesNotMatch(file, /—/);
+  for (const file of files) assert.doesNotMatch(file, /\u2014/);
 });
 
 test("uses real Letterboxd reviews without Netflix links", async () => {
@@ -99,6 +99,8 @@ test("connects Reel Mail to Resend with both delivery schedules", async () => {
   assert.match(newsletter, /Every New Review/);
   assert.match(newsletter, /Double Feature Digest/);
   assert.match(newsletter, /RESEND_UNSUBSCRIBE_URL/);
+  assert.match(newsletter, /body: JSON\.stringify\(topics\)/);
+  assert.doesNotMatch(newsletter, /body: JSON\.stringify\(\{ topics \}\)/);
   assert.match(newsletter, /sendInstantReview/);
   assert.match(newsletter, /sendBiweeklyDigest/);
   assert.match(publishRoute, /sendInstantReview/);

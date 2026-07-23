@@ -232,7 +232,7 @@ export async function syncNewsletterSubscriber(
   await resendRequest(runtimeEnv, `${contactPath}/segments/${selectedSegment}`, { method: "POST" });
   await resendRequest(runtimeEnv, `${contactPath}/topics`, {
     method: "PATCH",
-    body: JSON.stringify({ topics }),
+    body: JSON.stringify(topics),
   });
   return { status: "ready" as const };
 }
