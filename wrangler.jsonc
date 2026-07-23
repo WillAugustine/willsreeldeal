@@ -30,6 +30,7 @@
   },
   "vars": {
     "NEWSLETTER_FROM": "Will's Reel Deal <reelmail@updates.willsreeldeal.com>",
-    "NEWSLETTER_SITE_URL": "https://willsreeldeal.com"
+    "NEWSLETTER_SITE_URL": "https://willsreeldeal.com",
+    "STUDIO_OWNER_EMAIL": "willaugustine64@outlook.com"
   }
 }

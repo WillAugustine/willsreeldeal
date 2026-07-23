@@ -35,6 +35,7 @@ test("configures persistent review records and poster storage", async () => {
   const wrangler = JSON.parse(config);
   assert.equal(wrangler.d1_databases[0].binding, "DB");
   assert.equal(wrangler.r2_buckets[0].binding, "POSTERS");
+  assert.equal(wrangler.vars.STUDIO_OWNER_EMAIL, "willaugustine64@outlook.com");
   assert.match(auth, /cf-access-authenticated-user-email/);
   assert.match(auth, /STUDIO_OWNER_EMAIL/);
 });
