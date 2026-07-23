@@ -75,3 +75,36 @@ test("uses verified movie destinations and the Amazon Associates tag", async () 
   assert.match(catalog, /tv\.apple\.com\/us\/movie\/i-swear/);
   assert.doesNotMatch(catalog, /movieKey\("Palm Springs", "2020"\)/);
 });
+
+test("starts the request leaderboard empty without demo vote seeding", async () => {
+  const [home, community] = await Promise.all([
+    source("app/page.tsx"),
+    source("app/api/community/route.ts"),
+  ]);
+
+  assert.match(home, /useState<Leader\[\]>\(\[\]\)/);
+  assert.match(home, /Be the first to pester Will/);
+  assert.doesNotMatch(community, /INSERT OR IGNORE INTO movie_requests/);
+});
+
+test("connects Reel Mail to Resend with both delivery schedules", async () => {
+  const [newsletter, publishRoute, worker, config] = await Promise.all([
+    source("app/newsletter-service.ts"),
+    source("app/studio/api/reviews/route.ts"),
+    source("worker/index.ts"),
+    source("wrangler.jsonc"),
+  ]);
+
+  assert.match(newsletter, /https:\/\/api\.resend\.com/);
+  assert.match(newsletter, /Every New Review/);
+  assert.match(newsletter, /Double Feature Digest/);
+  assert.match(newsletter, /RESEND_UNSUBSCRIBE_URL/);
+  assert.match(newsletter, /sendInstantReview/);
+  assert.match(newsletter, /sendBiweeklyDigest/);
+  assert.match(publishRoute, /sendInstantReview/);
+  assert.match(worker, /async scheduled/);
+  assert.match(worker, /sendBiweeklyDigest/);
+  const wrangler = JSON.parse(config);
+  assert.deepEqual(wrangler.triggers.crons, ["0 17 * * FRI"]);
+  assert.equal(wrangler.vars.NEWSLETTER_SITE_URL, "https://willsreeldeal.com");
+});

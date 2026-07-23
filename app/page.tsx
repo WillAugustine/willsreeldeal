@@ -117,14 +117,6 @@ const moodMovies: Movie[] = [
   { id: "m12", title: "The Wild Robot", year: "2024", genre: "Animation", runtime: 102, vibe: "cozy", color: "#418a6c", blurb: "A robot, a goose, and an ambush of emotions." },
 ];
 
-const fallbackLeaders: Leader[] = [
-  { id: "Q13417189", title: "The Wild Robot", year: "2024", votes: 47 },
-  { id: "Q111667044", title: "Sinners", year: "2025", votes: 39 },
-  { id: "Q104123", title: "The Godfather", year: "1972", votes: 31 },
-  { id: "Q189330", title: "Interstellar", year: "2014", votes: 26 },
-  { id: "Q63985561", title: "The Substance", year: "2024", votes: 19 },
-];
-
 function Poster({ movie, compact = false }: { movie: Movie; compact?: boolean }) {
   const artwork = movie.poster;
   return (
@@ -152,7 +144,7 @@ function WatchLinks({ movie, compact = false }: { movie: Movie; compact?: boolea
 
 export default function Home() {
   const [reviews, setReviews] = useState<Movie[]>(fallbackReviews);
-  const [leaders, setLeaders] = useState<Leader[]>(fallbackLeaders);
+  const [leaders, setLeaders] = useState<Leader[]>([]);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Movie[]>([]);
   const [selected, setSelected] = useState<Movie | null>(null);
@@ -169,7 +161,7 @@ export default function Home() {
   useEffect(() => {
     fetch("/api/community")
       .then((response) => (response.ok ? response.json() : Promise.reject()))
-      .then((data) => data.leaders?.length && setLeaders(data.leaders))
+      .then((data) => setLeaders(data.leaders ?? []))
       .catch(() => undefined);
   }, []);
 
@@ -425,13 +417,18 @@ export default function Home() {
         <div className="leaderboard">
           <div className="leaderboard__heading"><span>Live-ish</span><h3>The People’s Pester List</h3><p>Top five most-requested reviews</p></div>
           <ol>
-            {leaders.map((movie, index) => (
-              <li key={movie.id}>
-                <span className="leader-rank">{String(index + 1).padStart(2, "0")}</span>
-                <div><strong>{movie.title}</strong><small>{movie.year}</small></div>
-                <span className="vote-count"><strong>{movie.votes}</strong> requests</span>
-              </li>
-            ))}
+            {leaders.length > 0 ? leaders.map((movie, index) => (
+                <li key={movie.id}>
+                  <span className="leader-rank">{String(index + 1).padStart(2, "0")}</span>
+                  <div><strong>{movie.title}</strong><small>{movie.year}</small></div>
+                  <span className="vote-count"><strong>{movie.votes}</strong> requests</span>
+                </li>
+              )) : (
+                <li className="leaderboard__empty">
+                  <span className="leader-rank">00</span>
+                  <div><strong>Wide open</strong><small>Be the first to pester Will.</small></div>
+                </li>
+              )}
           </ol>
           <p className="leaderboard__note">Updated whenever someone adds a vote. Yes, your lobbying matters.</p>
         </div>
@@ -451,6 +448,7 @@ export default function Home() {
           </div>
           <div className="email-row"><label htmlFor="email">Email address</label><input id="email" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@probablywatching.com" /><button className="button button--dark" type="submit">Join Reel Mail →</button></div>
           <p className="form-message" aria-live="polite">{newsletterMessage}</p>
+          <p className="newsletter__consent">By joining, you agree to receive Reel Mail at the schedule you selected. Every message includes an unsubscribe link.</p>
         </form>
       </section>
 

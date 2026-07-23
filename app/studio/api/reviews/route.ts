@@ -1,7 +1,15 @@
 import { env } from "cloudflare:workers";
 import { getStudioOwner } from "../../../studio-auth";
+import { sendInstantReview } from "../../../newsletter-service";
 
-type RuntimeEnv = { DB?: D1Database; POSTERS?: R2Bucket };
+type RuntimeEnv = {
+  DB?: D1Database;
+  POSTERS?: R2Bucket;
+  RESEND_API_KEY?: string;
+  NEWSLETTER_FROM?: string;
+  NEWSLETTER_REPLY_TO?: string;
+  NEWSLETTER_SITE_URL?: string;
+};
 
 type ReviewRow = {
   id: number;
@@ -111,7 +119,10 @@ export async function POST(request: Request) {
       rating_tenths, blurb, review_text, poster_key, published_at FROM reviews WHERE id = ?`)
       .bind(result.meta.last_row_id)
       .first<ReviewRow>();
-    return Response.json({ ok: true, review: created ? serialize(created) : null });
+    const newsletter = created
+      ? await sendInstantReview(db, runtimeEnv, created)
+      : { status: "pending" as const };
+    return Response.json({ ok: true, review: created ? serialize(created) : null, newsletter });
   } catch {
     if (posterKey) await runtimeEnv.POSTERS.delete(posterKey).catch(() => undefined);
     return Response.json({ error: "The projector jammed. Your review was not published." }, { status: 500 });

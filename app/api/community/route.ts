@@ -1,31 +1,25 @@
 import { env } from "cloudflare:workers";
+import { ensureNewsletterTables, syncNewsletterSubscriber } from "../../newsletter-service";
 
-type RuntimeEnv = { DB?: D1Database };
+type RuntimeEnv = {
+  DB?: D1Database;
+  RESEND_API_KEY?: string;
+  NEWSLETTER_FROM?: string;
+  NEWSLETTER_REPLY_TO?: string;
+  NEWSLETTER_SITE_URL?: string;
+};
 
 async function database() {
   const db = (env as unknown as RuntimeEnv).DB;
   if (!db) return null;
-  await db.batch([
-    db.prepare(`CREATE TABLE IF NOT EXISTS newsletter_subscribers (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      email TEXT NOT NULL UNIQUE,
-      frequency TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS movie_requests (
+  await ensureNewsletterTables(db);
+  await db.prepare(`CREATE TABLE IF NOT EXISTS movie_requests (
       movie_id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       release_year TEXT NOT NULL DEFAULT '',
       votes INTEGER NOT NULL DEFAULT 1,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`),
-    db.prepare("INSERT OR IGNORE INTO movie_requests (movie_id, title, release_year, votes) VALUES ('Q124378349', 'The Wild Robot', '2024', 47)"),
-    db.prepare("INSERT OR IGNORE INTO movie_requests (movie_id, title, release_year, votes) VALUES ('Q125473145', 'Sinners', '2025', 39)"),
-    db.prepare("INSERT OR IGNORE INTO movie_requests (movie_id, title, release_year, votes) VALUES ('Q47703', 'The Godfather', '1972', 31)"),
-    db.prepare("INSERT OR IGNORE INTO movie_requests (movie_id, title, release_year, votes) VALUES ('Q13417189', 'Interstellar', '2014', 26)"),
-    db.prepare("INSERT OR IGNORE INTO movie_requests (movie_id, title, release_year, votes) VALUES ('Q113380226', 'The Substance', '2024', 19)"),
-  ]);
+    )`).run();
   return db;
 }
 
@@ -56,7 +50,14 @@ export async function POST(request: Request) {
       if (!/^\S+@\S+\.\S+$/.test(email)) return Response.json({ error: "A valid email is required" }, { status: 400 });
       await db.prepare(`INSERT INTO newsletter_subscribers (email, frequency) VALUES (?, ?)
         ON CONFLICT(email) DO UPDATE SET frequency = excluded.frequency, updated_at = CURRENT_TIMESTAMP`).bind(email, frequency).run();
-      return Response.json({ ok: true });
+      let delivery = "pending";
+      try {
+        const synced = await syncNewsletterSubscriber(db, env as unknown as RuntimeEnv, { email, frequency });
+        delivery = synced.status;
+      } catch {
+        delivery = "pending";
+      }
+      return Response.json({ ok: true, delivery });
     }
 
     if (payload.action === "request") {

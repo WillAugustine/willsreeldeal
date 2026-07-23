@@ -1,11 +1,16 @@
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
+import { sendBiweeklyDigest } from "../app/newsletter-service";
 
 interface Env {
   ASSETS: Fetcher;
   DB: D1Database;
   POSTERS: R2Bucket;
+  RESEND_API_KEY?: string;
+  NEWSLETTER_FROM?: string;
+  NEWSLETTER_REPLY_TO?: string;
+  NEWSLETTER_SITE_URL?: string;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -42,6 +47,9 @@ const worker = {
     }
 
     return handler.fetch(request, env, ctx);
+  },
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(sendBiweeklyDigest(env.DB, env));
   },
 };
 

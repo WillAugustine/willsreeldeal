@@ -24,5 +24,12 @@
       "binding": "POSTERS",
       "bucket_name": "wills-reel-deal-posters"
     }
-  ]
+  ],
+  "triggers": {
+    "crons": ["0 17 * * FRI"]
+  },
+  "vars": {
+    "NEWSLETTER_FROM": "Will's Reel Deal <reelmail@updates.willsreeldeal.com>",
+    "NEWSLETTER_SITE_URL": "https://willsreeldeal.com"
+  }
 }

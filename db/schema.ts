@@ -9,6 +9,27 @@ export const newsletterSubscribers = sqliteTable("newsletter_subscribers", {
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
+export const newsletterConfiguration = sqliteTable("newsletter_configuration", {
+  id: integer("id").primaryKey(),
+  instantSegmentId: text("instant_segment_id").notNull(),
+  biweeklySegmentId: text("biweekly_segment_id").notNull(),
+  instantTopicId: text("instant_topic_id").notNull(),
+  biweeklyTopicId: text("biweekly_topic_id").notNull(),
+  initializedAt: text("initialized_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const newsletterSends = sqliteTable("newsletter_sends", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  sendKey: text("send_key").notNull().unique(),
+  kind: text("kind").notNull(),
+  status: text("status").notNull(),
+  providerId: text("provider_id"),
+  errorMessage: text("error_message"),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  completedAt: text("completed_at"),
+});
+
 export const movieRequests = sqliteTable("movie_requests", {
   movieId: text("movie_id").primaryKey(),
   title: text("title").notNull(),
