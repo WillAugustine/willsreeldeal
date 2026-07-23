@@ -60,3 +60,18 @@ test("uses real Letterboxd reviews without Netflix links", async () => {
   assert.doesNotMatch(home, /netflix/i);
   assert.doesNotMatch(affiliateRoute, /netflix/i);
 });
+
+test("uses verified movie destinations and the Amazon Associates tag", async () => {
+  const [home, affiliateRoute, catalog] = await Promise.all([
+    source("app/page.tsx"),
+    source("app/go/[provider]/route.ts"),
+    source("app/watch-catalog.ts"),
+  ]);
+
+  assert.match(home, /getWatchListing\(movie\.title, movie\.year\)/);
+  assert.match(affiliateRoute, /willsreeldeal-20/);
+  assert.match(affiliateRoute, /gp\/video\/detail/);
+  assert.match(catalog, /0UAG2NRWRJA02MMHU02N5RX8WR/);
+  assert.match(catalog, /tv\.apple\.com\/us\/movie\/i-swear/);
+  assert.doesNotMatch(catalog, /movieKey\("Palm Springs", "2020"\)/);
+});

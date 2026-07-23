@@ -79,6 +79,7 @@ main { overflow: hidden; }
 .poster--compact.poster--art strong { font-size: 11px; }
 
 .watch-links { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; }
+.watch-links a:only-child { grid-column: 1 / -1; }
 .watch-links a { min-height: 38px; padding: 0 10px; background: var(--forest); color: var(--cream); display: flex; align-items: center; justify-content: space-between; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
 .watch-links a:hover { background: var(--forest-mid); }
 .watch-links--compact { display: flex; flex-wrap: wrap; }

@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
+import { getWatchListing } from "./watch-catalog";
 
 type Movie = {
   id: string;
@@ -138,11 +139,13 @@ function Poster({ movie, compact = false }: { movie: Movie; compact?: boolean })
 }
 
 function WatchLinks({ movie, compact = false }: { movie: Movie; compact?: boolean }) {
-  const query = `?title=${encodeURIComponent(movie.title)}`;
+  const listing = getWatchListing(movie.title, movie.year);
+  if (!listing) return null;
+  const query = `?title=${encodeURIComponent(movie.title)}&year=${encodeURIComponent(movie.year)}`;
   return (
     <div className={`watch-links ${compact ? "watch-links--compact" : ""}`} aria-label={`Where to watch ${movie.title}`}>
-      <a href={`/go/amazon${query}`} target="_blank" rel="sponsored noopener">Amazon <span>↗</span></a>
-      <a href={`/go/apple${query}`} target="_blank" rel="sponsored noopener">Apple TV <span>↗</span></a>
+      {(listing.amazonId || listing.amazonQuery) && <a href={`/go/amazon${query}`} target="_blank" rel="sponsored noopener">Amazon <span>↗</span></a>}
+      {listing.appleUrl && <a href={`/go/apple${query}`} target="_blank" rel="noopener">Apple TV <span>↗</span></a>}
     </div>
   );
 }
@@ -455,7 +458,7 @@ export default function Home() {
         <a className="brand brand--footer" href="#top"><span className="brand__stamp">W</span><span>Will’s Reel Deal<small>opinions, lightly buttered</small></span></a>
         <p>Made by a movie fan, not a movie critic.<br />© 2026 Will’s Reel Deal</p>
         <div className="footer-links"><a href="#reviews">Reviews</a><a href="#picker">Find a movie</a><a href="#request">Request one</a><a href="https://letterboxd.com/foodiefrank/" target="_blank" rel="noopener">Letterboxd ↗</a><a href="#affiliate-note">Affiliate note</a></div>
-        <p className="affiliate-note" id="affiliate-note"><strong>Keeping the lights dim:</strong> Amazon and Apple links may become affiliate links once Will is approved for their programs. A qualifying purchase may earn a commission at no added cost to you.</p>
+        <p className="affiliate-note" id="affiliate-note"><strong>Keeping the lights dim:</strong> As an Amazon Associate, Will earns from qualifying purchases. Apple TV links are provided as a convenience and are not currently affiliate links. Prices and availability can change.</p>
         <span className="footer-wink">ROLL CREDITS →</span>
       </footer>
 
