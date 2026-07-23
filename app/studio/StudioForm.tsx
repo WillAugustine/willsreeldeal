@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { formatReviewGenres, REVIEW_GENRES } from "../genres";
 
 type Movie = { id: string; title: string; year: string };
 
@@ -10,6 +11,7 @@ export default function StudioForm() {
   const [selected, setSelected] = useState<Movie | null>(null);
   const [searching, setSearching] = useState(false);
   const [posterPreview, setPosterPreview] = useState("");
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const [publishing, setPublishing] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -53,6 +55,7 @@ export default function StudioForm() {
     form.set("movieId", selected.id);
     form.set("title", selected.title);
     form.set("year", selected.year);
+    form.set("genre", formatReviewGenres(selectedGenres));
 
     try {
       const response = await fetch("/studio/api/reviews", { method: "POST", body: form });
@@ -63,6 +66,7 @@ export default function StudioForm() {
       setQuery("");
       setSelected(null);
       setResults([]);
+      setSelectedGenres([]);
       previewPoster();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "The projector jammed. Try again.");
@@ -104,11 +108,31 @@ export default function StudioForm() {
         {selected && <p className="studio-selected">Locked in: <strong>{selected.title}</strong> ({selected.year}) <button type="button" onClick={() => { setSelected(null); setQuery(""); }}>Change</button></p>}
       </div>
 
-      <div className="studio-form__row">
-        <div className="studio-field">
-          <label htmlFor="genre">Genre</label>
-          <input id="genre" name="genre" placeholder="Sci-fi comedy" required />
+      <fieldset className="studio-field studio-genre-field">
+        <legend>Genres</legend>
+        <p>Pick every genre that fits. The site keeps spelling and formatting consistent.</p>
+        <div className="studio-genre-grid">
+          {REVIEW_GENRES.map((genre) => {
+            const checked = selectedGenres.includes(genre);
+            return (
+              <label className={checked ? "selected" : ""} key={genre}>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => setSelectedGenres((current) => (
+                    current.includes(genre)
+                      ? current.filter((item) => item !== genre)
+                      : [...current, genre]
+                  ))}
+                />
+                <span>{genre}</span>
+              </label>
+            );
+          })}
         </div>
+      </fieldset>
+
+      <div className="studio-form__row studio-form__row--numbers">
         <div className="studio-field studio-field--small">
           <label htmlFor="runtime">Runtime</label>
           <div className="input-suffix"><input id="runtime" name="runtime" type="number" min="1" max="600" placeholder="120" required /><span>MIN</span></div>
@@ -139,7 +163,7 @@ export default function StudioForm() {
 
       <div className="studio-submit">
         <p aria-live="polite">{message || "Publishing makes the review visible on the homepage immediately."}</p>
-        <button className="button button--lime" type="submit" disabled={publishing || !selected}>{publishing ? "Publishing..." : "Publish the take"}<span>↗</span></button>
+        <button className="button button--lime" type="submit" disabled={publishing || !selected || selectedGenres.length === 0}>{publishing ? "Publishing..." : "Publish the take"}<span>↗</span></button>
       </div>
     </form>
   );

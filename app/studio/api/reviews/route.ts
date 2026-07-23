@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { getStudioOwner } from "../../../studio-auth";
 import { sendInstantReview } from "../../../newsletter-service";
+import { formatReviewGenres, parseReviewGenres } from "../../../genres";
 
 type RuntimeEnv = {
   DB?: D1Database;
@@ -87,7 +88,8 @@ export async function POST(request: Request) {
     const movieId = textField(form, "movieId");
     const title = textField(form, "title");
     const releaseYear = textField(form, "year");
-    const genre = textField(form, "genre");
+    const genres = parseReviewGenres(textField(form, "genre"));
+    const genre = formatReviewGenres(genres);
     const runtime = Number(textField(form, "runtime"));
     const rating = Number(textField(form, "rating"));
     const blurb = textField(form, "blurb");
@@ -95,7 +97,7 @@ export async function POST(request: Request) {
     const poster = form.get("poster");
 
     if (!movieId || !title) return Response.json({ error: "Select a movie from the search results." }, { status: 400 });
-    if (!genre || !Number.isInteger(runtime) || runtime < 1 || runtime > 600) return Response.json({ error: "Add a genre and valid runtime." }, { status: 400 });
+    if (!genre || !Number.isInteger(runtime) || runtime < 1 || runtime > 600) return Response.json({ error: "Pick at least one listed genre and add a valid runtime." }, { status: 400 });
     if (!Number.isFinite(rating) || rating < 0 || rating > 10) return Response.json({ error: "The Will-o-Meter needs a score from 0 to 10." }, { status: 400 });
     if (blurb.length < 10 || reviewText.length < 40) return Response.json({ error: "Add a quick take and at least 40 characters for the full review." }, { status: 400 });
     if (!(poster instanceof File) || poster.size === 0) return Response.json({ error: "Upload one poster image." }, { status: 400 });

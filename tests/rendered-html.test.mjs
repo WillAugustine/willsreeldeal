@@ -21,6 +21,21 @@ test("keeps poster selection inside Will's review studio", async () => {
   assert.match(studio, /fetch\("\/studio\/api\/reviews", \{ method: "POST"/);
 });
 
+test("uses a typo-proof genre checklist for new reviews", async () => {
+  const [studio, genres, route] = await Promise.all([
+    source("app/studio/StudioForm.tsx"),
+    source("app/genres.ts"),
+    source("app/studio/api/reviews/route.ts"),
+  ]);
+
+  assert.match(studio, /REVIEW_GENRES\.map/);
+  assert.match(studio, /type="checkbox"/);
+  assert.match(studio, /formatReviewGenres\(selectedGenres\)/);
+  assert.doesNotMatch(studio, /name="genre" placeholder/);
+  assert.match(genres, /"Science Fiction"/);
+  assert.match(route, /parseReviewGenres/);
+});
+
 test("configures persistent review records and poster storage", async () => {
   const [schema, route, config, auth] = await Promise.all([
     source("db/schema.ts"),
@@ -58,8 +73,24 @@ test("uses real Letterboxd reviews without Netflix links", async () => {
   assert.match(home, /letterboxd\.com\/foodiefrank/);
   assert.match(home, /title: "I Swear"/);
   assert.match(home, /title: "The Batman"/);
+  assert.match(home, /title: "Jurassic Park"/);
+  assert.match(home, /title: "Chef"/);
+  assert.match(home, /title: "Stuck on You"/);
   assert.doesNotMatch(home, /netflix/i);
   assert.doesNotMatch(affiliateRoute, /netflix/i);
+});
+
+test("shows decimal ratings, the 1-10 scale, and the latest-watch label", async () => {
+  const home = await source("app/page.tsx");
+
+  assert.match(home, /Will’s latest watch/);
+  assert.doesNotMatch(home, /Will’s pick of the week/);
+  assert.match(home, /rating: 9\.2/);
+  assert.match(home, /rating: 7\.8/);
+  assert.match(home, /rating\.toFixed\(1\)/);
+  assert.match(home, /\["1", "Abysmal"/);
+  assert.match(home, /\["10", "Masterpiece"/);
+  assert.match(home, /What every number actually means/);
 });
 
 test("uses verified movie destinations and the Amazon Associates tag", async () => {
