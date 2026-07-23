@@ -14,6 +14,9 @@ type ReviewRow = {
   blurb: string;
   review_text: string;
   favorite_quote: string;
+  rewatch_odds: string;
+  watch_party: string;
+  sleep_risk: string;
   poster_key: string;
   poster_content_type: string;
   published_at: string;
@@ -34,14 +37,23 @@ async function database() {
     blurb TEXT NOT NULL,
     review_text TEXT NOT NULL,
     favorite_quote TEXT NOT NULL DEFAULT '',
+    rewatch_odds TEXT NOT NULL DEFAULT '',
+    watch_party TEXT NOT NULL DEFAULT '',
+    sleep_risk TEXT NOT NULL DEFAULT '',
     poster_key TEXT NOT NULL,
     poster_content_type TEXT NOT NULL,
     created_by TEXT NOT NULL,
     published_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`).run();
   const columns = await db.prepare(`PRAGMA table_info(reviews)`).all<{ name: string }>();
-  if (!columns.results.some((column) => column.name === "favorite_quote")) {
-    await db.prepare(`ALTER TABLE reviews ADD COLUMN favorite_quote TEXT NOT NULL DEFAULT ''`).run();
+  const missingColumns = [
+    ["favorite_quote", `ALTER TABLE reviews ADD COLUMN favorite_quote TEXT NOT NULL DEFAULT ''`],
+    ["rewatch_odds", `ALTER TABLE reviews ADD COLUMN rewatch_odds TEXT NOT NULL DEFAULT ''`],
+    ["watch_party", `ALTER TABLE reviews ADD COLUMN watch_party TEXT NOT NULL DEFAULT ''`],
+    ["sleep_risk", `ALTER TABLE reviews ADD COLUMN sleep_risk TEXT NOT NULL DEFAULT ''`],
+  ] as const;
+  for (const [name, statement] of missingColumns) {
+    if (!columns.results.some((column) => column.name === name)) await db.prepare(statement).run();
   }
   return db;
 }
@@ -59,6 +71,9 @@ function serialize(row: ReviewRow) {
     blurb: row.blurb,
     reviewText: row.review_text,
     favoriteQuote: row.favorite_quote,
+    rewatchOdds: row.rewatch_odds,
+    watchParty: row.watch_party,
+    sleepRisk: row.sleep_risk,
     poster: row.poster_content_type === "external/url"
       ? row.poster_key
       : `/api/posters/${encodeURIComponent(row.poster_key)}`,
@@ -71,7 +86,8 @@ export async function GET() {
     const db = await database();
     if (!db) return Response.json({ reviews: [] });
     const result = await db.prepare(`SELECT id, slug, movie_id, title, release_year, genre, runtime,
-      rating_tenths, blurb, review_text, favorite_quote, poster_key, poster_content_type, published_at
+      rating_tenths, blurb, review_text, favorite_quote, rewatch_odds, watch_party, sleep_risk,
+      poster_key, poster_content_type, published_at
       FROM reviews ORDER BY published_at DESC, id DESC LIMIT 24`).all<ReviewRow>();
     return Response.json({ reviews: result.results.map(serialize) });
   } catch {

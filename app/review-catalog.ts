@@ -9,6 +9,9 @@ export type CatalogReview = {
   blurb: string;
   reviewText: string;
   favoriteQuote?: string;
+  rewatchOdds?: string;
+  watchParty?: string;
+  sleepRisk?: string;
   poster: string;
   letterboxdUrl: string;
 };

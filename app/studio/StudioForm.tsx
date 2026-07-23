@@ -2,6 +2,13 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { formatReviewGenres, parseReviewGenres, REVIEW_GENRES } from "../genres";
+import {
+  formatWatchParties,
+  parseWatchParties,
+  REWATCH_ODDS,
+  SLEEP_RISKS,
+  WATCH_PARTIES,
+} from "../review-experience";
 
 type Movie = { id: string; title: string; year: string; runtime: number | null };
 type PublishedReview = {
@@ -15,6 +22,9 @@ type PublishedReview = {
   blurb: string;
   reviewText: string;
   favoriteQuote: string;
+  rewatchOdds: string;
+  watchParty: string;
+  sleepRisk: string;
   poster: string;
   publishedAt: string;
 };
@@ -31,6 +41,9 @@ export default function StudioForm() {
   const [blurb, setBlurb] = useState("");
   const [reviewText, setReviewText] = useState("");
   const [favoriteQuote, setFavoriteQuote] = useState("");
+  const [rewatchOdds, setRewatchOdds] = useState("");
+  const [watchParties, setWatchParties] = useState<string[]>([]);
+  const [sleepRisk, setSleepRisk] = useState("");
   const [message, setMessage] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [reviews, setReviews] = useState<PublishedReview[]>([]);
@@ -99,6 +112,9 @@ export default function StudioForm() {
     setBlurb("");
     setReviewText("");
     setFavoriteQuote("");
+    setRewatchOdds("");
+    setWatchParties([]);
+    setSleepRisk("");
     setMessage(nextMessage);
   }
 
@@ -116,6 +132,9 @@ export default function StudioForm() {
     setBlurb(review.blurb);
     setReviewText(review.reviewText);
     setFavoriteQuote(review.favoriteQuote ?? "");
+    setRewatchOdds(review.rewatchOdds ?? "");
+    setWatchParties(parseWatchParties(review.watchParty ?? ""));
+    setSleepRisk(review.sleepRisk ?? "");
     setPosterPreview(review.poster);
     setMessage(`Editing ${review.title}. The current poster stays unless you choose a new one.`);
     window.setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
@@ -135,6 +154,9 @@ export default function StudioForm() {
     form.set("year", selected.year);
     form.set("genre", formatReviewGenres(selectedGenres));
     form.set("runtime", runtime);
+    form.set("rewatchOdds", rewatchOdds);
+    form.set("watchParty", formatWatchParties(watchParties));
+    form.set("sleepRisk", sleepRisk);
     if (editingId) form.set("reviewId", editingId);
 
     try {
@@ -288,6 +310,71 @@ export default function StudioForm() {
             rows={3}
             placeholder="The line you immediately wanted to repeat"
           />
+        </div>
+
+        <div className="studio-experience-panel">
+          <div className="studio-experience-panel__heading">
+            <span>Couch experience</span>
+            <p>Optional details that tell readers what watching it actually felt like.</p>
+          </div>
+
+          <fieldset className="studio-experience-field">
+            <legend>Rewatch Odds <span>Optional</span></legend>
+            <div className="studio-choice-grid">
+              {REWATCH_ODDS.map((option) => (
+                <button
+                  className={rewatchOdds === option ? "selected" : ""}
+                  type="button"
+                  aria-pressed={rewatchOdds === option}
+                  key={option}
+                  onClick={() => setRewatchOdds((current) => current === option ? "" : option)}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+
+          <fieldset className="studio-experience-field">
+            <legend>Ideal Watch Party <span>Pick any that fit</span></legend>
+            <div className="studio-choice-grid">
+              {WATCH_PARTIES.map((option) => {
+                const selectedOption = watchParties.includes(option);
+                return (
+                  <button
+                    className={selectedOption ? "selected" : ""}
+                    type="button"
+                    aria-pressed={selectedOption}
+                    key={option}
+                    onClick={() => setWatchParties((current) => (
+                      current.includes(option)
+                        ? current.filter((item) => item !== option)
+                        : [...current, option]
+                    ))}
+                  >
+                    {option}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+
+          <fieldset className="studio-experience-field">
+            <legend>Sleep Risk <span>Optional</span></legend>
+            <div className="studio-choice-grid studio-choice-grid--three">
+              {SLEEP_RISKS.map((option) => (
+                <button
+                  className={sleepRisk === option ? "selected" : ""}
+                  type="button"
+                  aria-pressed={sleepRisk === option}
+                  key={option}
+                  onClick={() => setSleepRisk((current) => current === option ? "" : option)}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </fieldset>
         </div>
 
         <div className="studio-field">

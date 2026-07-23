@@ -3,6 +3,13 @@ import { getStudioOwner } from "../../../studio-auth";
 import { sendInstantReview } from "../../../newsletter-service";
 import { formatReviewGenres, parseReviewGenres } from "../../../genres";
 import { fallbackReviews } from "../../../review-catalog";
+import {
+  canonicalChoice,
+  formatWatchParties,
+  parseWatchParties,
+  REWATCH_ODDS,
+  SLEEP_RISKS,
+} from "../../../review-experience";
 
 type RuntimeEnv = {
   DB?: D1Database;
@@ -25,6 +32,9 @@ type ReviewRow = {
   blurb: string;
   review_text: string;
   favorite_quote: string;
+  rewatch_odds: string;
+  watch_party: string;
+  sleep_risk: string;
   poster_key: string;
   poster_content_type: string;
   published_at: string;
@@ -40,10 +50,14 @@ type ReviewFields = {
   blurb: string;
   reviewText: string;
   favoriteQuote: string;
+  rewatchOdds: string;
+  watchParty: string;
+  sleepRisk: string;
 };
 
 const reviewColumns = `id, slug, movie_id, title, release_year, genre, runtime,
-  rating_tenths, blurb, review_text, favorite_quote, poster_key, poster_content_type, published_at`;
+  rating_tenths, blurb, review_text, favorite_quote, rewatch_odds, watch_party, sleep_risk,
+  poster_key, poster_content_type, published_at`;
 const allowedPosterTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 async function database() {
@@ -61,14 +75,23 @@ async function database() {
     blurb TEXT NOT NULL,
     review_text TEXT NOT NULL,
     favorite_quote TEXT NOT NULL DEFAULT '',
+    rewatch_odds TEXT NOT NULL DEFAULT '',
+    watch_party TEXT NOT NULL DEFAULT '',
+    sleep_risk TEXT NOT NULL DEFAULT '',
     poster_key TEXT NOT NULL,
     poster_content_type TEXT NOT NULL,
     created_by TEXT NOT NULL,
     published_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`).run();
   const columns = await db.prepare(`PRAGMA table_info(reviews)`).all<{ name: string }>();
-  if (!columns.results.some((column) => column.name === "favorite_quote")) {
-    await db.prepare(`ALTER TABLE reviews ADD COLUMN favorite_quote TEXT NOT NULL DEFAULT ''`).run();
+  const missingColumns = [
+    ["favorite_quote", `ALTER TABLE reviews ADD COLUMN favorite_quote TEXT NOT NULL DEFAULT ''`],
+    ["rewatch_odds", `ALTER TABLE reviews ADD COLUMN rewatch_odds TEXT NOT NULL DEFAULT ''`],
+    ["watch_party", `ALTER TABLE reviews ADD COLUMN watch_party TEXT NOT NULL DEFAULT ''`],
+    ["sleep_risk", `ALTER TABLE reviews ADD COLUMN sleep_risk TEXT NOT NULL DEFAULT ''`],
+  ] as const;
+  for (const [name, statement] of missingColumns) {
+    if (!columns.results.some((column) => column.name === name)) await db.prepare(statement).run();
   }
   return db;
 }
@@ -86,6 +109,9 @@ function serialize(row: ReviewRow) {
     blurb: row.blurb,
     reviewText: row.review_text,
     favoriteQuote: row.favorite_quote,
+    rewatchOdds: row.rewatch_odds,
+    watchParty: row.watch_party,
+    sleepRisk: row.sleep_risk,
     poster: row.poster_content_type === "external/url"
       ? row.poster_key
       : `/api/posters/${encodeURIComponent(row.poster_key)}`,
@@ -105,6 +131,9 @@ function serializeCatalogReview(review: typeof fallbackReviews[number]) {
     blurb: review.blurb,
     reviewText: review.reviewText,
     favoriteQuote: review.favoriteQuote ?? "",
+    rewatchOdds: review.rewatchOdds ?? "",
+    watchParty: review.watchParty ?? "",
+    sleepRisk: review.sleepRisk ?? "",
     poster: review.poster,
     publishedAt: "",
   };
@@ -130,6 +159,9 @@ function reviewFields(form: FormData): ReviewFields {
     blurb: textField(form, "blurb"),
     reviewText: textField(form, "reviewText"),
     favoriteQuote: textField(form, "favoriteQuote"),
+    rewatchOdds: canonicalChoice(textField(form, "rewatchOdds"), REWATCH_ODDS),
+    watchParty: formatWatchParties(parseWatchParties(textField(form, "watchParty"))),
+    sleepRisk: canonicalChoice(textField(form, "sleepRisk"), SLEEP_RISKS),
   };
 }
 
@@ -209,8 +241,9 @@ export async function POST(request: Request) {
     posterKey = await storePoster(runtimeEnv.POSTERS, poster);
 
     const result = await db.prepare(`INSERT INTO reviews
-      (slug, movie_id, title, release_year, genre, runtime, rating_tenths, blurb, review_text, favorite_quote, poster_key, poster_content_type, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      (slug, movie_id, title, release_year, genre, runtime, rating_tenths, blurb, review_text,
+      favorite_quote, rewatch_odds, watch_party, sleep_risk, poster_key, poster_content_type, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .bind(
         slug,
         fields.movieId,
@@ -222,6 +255,9 @@ export async function POST(request: Request) {
         fields.blurb,
         fields.reviewText,
         fields.favoriteQuote,
+        fields.rewatchOdds,
+        fields.watchParty,
+        fields.sleepRisk,
         posterKey,
         poster.type,
         owner.email,
@@ -276,8 +312,9 @@ export async function PUT(request: Request) {
       const posterContentType = replacementPoster?.type || "external/url";
       const slug = `${slugify(fields.title)}-${fields.releaseYear || "film"}-${Date.now().toString(36)}`;
       const result = await db.prepare(`INSERT INTO reviews
-        (slug, movie_id, title, release_year, genre, runtime, rating_tenths, blurb, review_text, favorite_quote, poster_key, poster_content_type, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        (slug, movie_id, title, release_year, genre, runtime, rating_tenths, blurb, review_text,
+        favorite_quote, rewatch_odds, watch_party, sleep_risk, poster_key, poster_content_type, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .bind(
           slug,
           fields.movieId,
@@ -289,6 +326,9 @@ export async function PUT(request: Request) {
           fields.blurb,
           fields.reviewText,
           fields.favoriteQuote,
+          fields.rewatchOdds,
+          fields.watchParty,
+          fields.sleepRisk,
           posterKey,
           posterContentType,
           owner.email,
@@ -311,7 +351,8 @@ export async function PUT(request: Request) {
 
     await db.prepare(`UPDATE reviews SET
       movie_id = ?, title = ?, release_year = ?, genre = ?, runtime = ?, rating_tenths = ?,
-      blurb = ?, review_text = ?, favorite_quote = ?, poster_key = ?, poster_content_type = ?
+      blurb = ?, review_text = ?, favorite_quote = ?, rewatch_odds = ?, watch_party = ?,
+      sleep_risk = ?, poster_key = ?, poster_content_type = ?
       WHERE id = ?`)
       .bind(
         fields.movieId,
@@ -323,6 +364,9 @@ export async function PUT(request: Request) {
         fields.blurb,
         fields.reviewText,
         fields.favoriteQuote,
+        fields.rewatchOdds,
+        fields.watchParty,
+        fields.sleepRisk,
         posterKey,
         posterContentType,
         reviewId,

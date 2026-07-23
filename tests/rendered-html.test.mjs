@@ -93,6 +93,39 @@ test("supports an optional favorite movie quote", async () => {
   assert.match(migration, /ALTER TABLE `reviews` ADD `favorite_quote`/);
 });
 
+test("captures the selected couch-experience details", async () => {
+  const [studio, studioRoute, publicRoute, home, newsletter, experience, schema, migration] = await Promise.all([
+    source("app/studio/StudioForm.tsx"),
+    source("app/studio/api/reviews/route.ts"),
+    source("app/api/reviews/route.ts"),
+    source("app/page.tsx"),
+    source("app/newsletter-service.ts"),
+    source("app/review-experience.ts"),
+    source("db/schema.ts"),
+    source("drizzle/0004_equal_mephisto.sql"),
+  ]);
+
+  assert.match(experience, /"Annual tradition"/);
+  assert.match(experience, /"Full theater"/);
+  assert.match(experience, /"Lost the battle"/);
+  assert.match(studio, /Rewatch Odds/);
+  assert.match(studio, /Ideal Watch Party/);
+  assert.match(studio, /Sleep Risk/);
+  assert.match(studio, /form\.set\("watchParty", formatWatchParties\(watchParties\)\)/);
+  assert.match(studio, /aria-pressed=\{selectedOption\}/);
+  assert.match(studioRoute, /canonicalChoice\(textField\(form, "rewatchOdds"\), REWATCH_ODDS\)/);
+  assert.match(studioRoute, /formatWatchParties\(parseWatchParties\(textField\(form, "watchParty"\)\)\)/);
+  assert.match(publicRoute, /sleepRisk: row\.sleep_risk/);
+  assert.match(home, /className="couch-stats"/);
+  assert.match(newsletter, /review\.rewatch_odds \|\| review\.watch_party \|\| review\.sleep_risk/);
+  assert.match(schema, /rewatchOdds: text\("rewatch_odds"\)/);
+  assert.match(schema, /watchParty: text\("watch_party"\)/);
+  assert.match(schema, /sleepRisk: text\("sleep_risk"\)/);
+  assert.match(migration, /ADD `rewatch_odds`/);
+  assert.match(migration, /ADD `watch_party`/);
+  assert.match(migration, /ADD `sleep_risk`/);
+});
+
 test("configures persistent review records and poster storage", async () => {
   const [schema, route, config, auth] = await Promise.all([
     source("db/schema.ts"),
