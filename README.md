@@ -50,12 +50,13 @@ production Worker also needs a `STUDIO_OWNER_EMAIL` environment variable.
 Cloudflare Access must protect both `/studio` and `/studio/*`, allowing only the
 owner email.
 
-For Reel Mail, verify `updates.willsreeldeal.com` in Resend and add a
-full-access Resend API key to the Worker as the `RESEND_API_KEY` secret. Then
-open `/studio` and select `Connect Reel Mail`. This creates the two delivery
-segments and preference topics, then syncs saved subscribers. New-review
-messages send when a review is published. The biweekly digest checks every
-Friday at 17:00 UTC and sends no more than once every 13 days.
+Reel Mail sends from the verified `updates.willsreeldeal.com` subdomain on
+Resend's free plan. Add a full-access Resend API key to the Worker as the
+`RESEND_API_KEY` secret. Then open `/studio` and select `Connect Reel Mail`.
+This creates the two delivery segments and preference topics, then syncs saved
+subscribers. New-review messages send when a review is published. The biweekly
+digest checks every Friday at 17:00 UTC and sends no more than once every 13
+days.
 
 Deployments are connected to the `WillAugustine/willsreeldeal` GitHub repository
 so a push to `main` can publish the latest verified version.
