@@ -133,6 +133,7 @@ test("captures the selected couch-experience details", async () => {
   ]);
 
   assert.match(experience, /"Annual tradition"/);
+  assert.match(experience, /"Never again",\s+"Probably not",\s+"Maybe someday"/);
   assert.match(experience, /"Full theater"/);
   assert.match(experience, /"Lost the battle"/);
   assert.match(studio, /Rewatch Odds/);

@@ -1,5 +1,6 @@
 export const REWATCH_ODDS = [
   "Never again",
+  "Probably not",
   "Maybe someday",
   "Absolutely",
   "Annual tradition",
