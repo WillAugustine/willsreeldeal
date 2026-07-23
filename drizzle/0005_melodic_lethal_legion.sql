@@ -1,0 +1,1 @@
+ALTER TABLE `reviews` ADD `content_rating` text DEFAULT '' NOT NULL;

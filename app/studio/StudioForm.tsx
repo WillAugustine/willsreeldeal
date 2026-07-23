@@ -10,7 +10,7 @@ import {
   WATCH_PARTIES,
 } from "../review-experience";
 
-type Movie = { id: string; title: string; year: string; runtime: number | null };
+type Movie = { id: string; title: string; year: string; runtime: number | null; contentRating?: string };
 type PublishedReview = {
   id: string;
   movieId: string;
@@ -18,6 +18,7 @@ type PublishedReview = {
   year: string;
   genre: string;
   runtime: number;
+  contentRating: string;
   rating: number;
   blurb: string;
   reviewText: string;
@@ -37,6 +38,7 @@ export default function StudioForm() {
   const [posterPreview, setPosterPreview] = useState("");
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [runtime, setRuntime] = useState("");
+  const [contentRating, setContentRating] = useState("");
   const [rating, setRating] = useState("");
   const [blurb, setBlurb] = useState("");
   const [reviewText, setReviewText] = useState("");
@@ -108,6 +110,7 @@ export default function StudioForm() {
     setResults([]);
     setSelectedGenres([]);
     setRuntime("");
+    setContentRating("");
     setRating("");
     setBlurb("");
     setReviewText("");
@@ -123,11 +126,12 @@ export default function StudioForm() {
     if (posterObjectUrl.current) URL.revokeObjectURL(posterObjectUrl.current);
     posterObjectUrl.current = "";
     setEditingId(review.id);
-    setSelected({ id: review.movieId, title: review.title, year: review.year, runtime: review.runtime });
+    setSelected({ id: review.movieId, title: review.title, year: review.year, runtime: review.runtime, contentRating: review.contentRating });
     setQuery(review.title);
     setResults([]);
     setSelectedGenres(parseReviewGenres(review.genre));
     setRuntime(String(review.runtime));
+    setContentRating(review.contentRating ?? "");
     setRating(review.rating.toFixed(1));
     setBlurb(review.blurb);
     setReviewText(review.reviewText);
@@ -154,6 +158,7 @@ export default function StudioForm() {
     form.set("year", selected.year);
     form.set("genre", formatReviewGenres(selectedGenres));
     form.set("runtime", runtime);
+    form.set("contentRating", contentRating);
     form.set("rewatchOdds", rewatchOdds);
     form.set("watchParty", formatWatchParties(watchParties));
     form.set("sleepRisk", sleepRisk);
@@ -229,6 +234,7 @@ export default function StudioForm() {
               if (selected && nextQuery !== selected.title) {
                 setSelected(null);
                 setRuntime("");
+                setContentRating("");
               }
               if (nextQuery.trim().length < 2) setResults([]);
             }} placeholder="Search the movie universe" autoComplete="off" required />
@@ -241,16 +247,17 @@ export default function StudioForm() {
                   setSelected(movie);
                   setQuery(movie.title);
                   setRuntime(movie.runtime ? String(movie.runtime) : "");
+                  setContentRating(movie.contentRating ?? "");
                   setResults([]);
                 }}>
                   <span className="result-dot" />
                   <strong>{movie.title}</strong>
-                  <small>{movie.year || "Year unknown"}{movie.runtime ? ` · ${movie.runtime} min` : ""}</small>
+                  <small>{movie.year || "Year unknown"}{movie.runtime ? ` · ${movie.runtime} min` : ""}{movie.contentRating ? ` · ${movie.contentRating}` : ""}</small>
                 </button>
               ))}
             </div>
           )}
-          {selected && <p className="studio-selected">Locked in: <strong>{selected.title}</strong> ({selected.year}) <button type="button" onClick={() => { setSelected(null); setQuery(""); setRuntime(""); }}>Change</button></p>}
+          {selected && <p className="studio-selected">Locked in: <strong>{selected.title}</strong> ({selected.year}) <button type="button" onClick={() => { setSelected(null); setQuery(""); setRuntime(""); setContentRating(""); }}>Change</button></p>}
         </div>
 
         <fieldset className="studio-field studio-genre-field">
@@ -281,6 +288,10 @@ export default function StudioForm() {
           <div className="studio-field studio-field--small">
             <label htmlFor="runtime">Runtime <span>Auto-filled</span></label>
             <div className="input-suffix"><input id="runtime" name="runtime" type="number" min="1" max="600" value={runtime} onChange={(event) => setRuntime(event.target.value)} placeholder="Select a movie" required /><span>MIN</span></div>
+          </div>
+          <div className="studio-field studio-field--small">
+            <label htmlFor="contentRating">Movie rating <span>Auto-filled</span></label>
+            <input id="contentRating" name="contentRating" type="text" maxLength={12} value={contentRating} onChange={(event) => setContentRating(event.target.value.toUpperCase())} placeholder="PG-13" />
           </div>
           <div className="studio-field studio-field--small">
             <label htmlFor="rating">Will-o-Meter</label>

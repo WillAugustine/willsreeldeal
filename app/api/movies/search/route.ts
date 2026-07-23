@@ -3,6 +3,7 @@ type MovieResult = {
   title: string;
   year: string;
   runtime: number | null;
+  contentRating?: string;
   poster?: string;
 };
 
@@ -21,6 +22,16 @@ type WikidataBinding = {
   date?: { value: string };
   duration?: { value: string };
   image?: { value: string };
+  contentRatingLabel?: { value: string };
+};
+
+type AppleMovie = {
+  trackId?: number;
+  trackName?: string;
+  releaseDate?: string;
+  trackTimeMillis?: number;
+  artworkUrl100?: string;
+  contentAdvisoryRating?: string;
 };
 
 const fallbackMovies: MovieResult[] = [
@@ -80,6 +91,36 @@ async function searchImdb(titleQuery: string): Promise<MovieResult[]> {
     }));
 }
 
+async function searchApple(titleQuery: string): Promise<MovieResult[]> {
+  const params = new URLSearchParams({
+    term: titleQuery,
+    country: "US",
+    media: "movie",
+    entity: "movie",
+    limit: "50",
+  });
+  const response = await fetch(`https://itunes.apple.com/search?${params}`, {
+    headers: { Accept: "application/json", "User-Agent": "WillsReelDeal/1.0" },
+    signal: AbortSignal.timeout(3500),
+  });
+  if (!response.ok) throw new Error("Apple movie catalog unavailable");
+  const data = await response.json() as { results?: AppleMovie[] };
+
+  return (data.results ?? [])
+    .filter((item) => item.trackId && item.trackName)
+    .map((item) => {
+      const minutes = Math.round(Number(item.trackTimeMillis) / 60000);
+      return {
+        id: `apple-${item.trackId}`,
+        title: item.trackName as string,
+        year: item.releaseDate?.slice(0, 4) ?? "",
+        runtime: Number.isInteger(minutes) && minutes >= 1 && minutes <= 600 ? minutes : null,
+        contentRating: item.contentAdvisoryRating?.trim() || undefined,
+        poster: item.artworkUrl100?.replace("100x100bb", "200x300bb"),
+      };
+    });
+}
+
 function commonsPoster(imageUrl?: string) {
   if (!imageUrl) return undefined;
   const filename = decodeURIComponent(imageUrl.split("/").pop() ?? "");
@@ -90,7 +131,7 @@ function commonsPoster(imageUrl?: string) {
 
 async function searchWikidata(titleQuery: string): Promise<MovieResult[]> {
   const sparql = `
-    SELECT DISTINCT ?item ?itemLabel ?date ?duration ?image WHERE {
+    SELECT DISTINCT ?item ?itemLabel ?date ?duration ?image ?contentRatingLabel WHERE {
       SERVICE wikibase:mwapi {
         bd:serviceParam wikibase:endpoint "www.wikidata.org";
           wikibase:api "EntitySearch";
@@ -103,6 +144,7 @@ async function searchWikidata(titleQuery: string): Promise<MovieResult[]> {
       OPTIONAL { ?item wdt:P577 ?date. }
       OPTIONAL { ?item wdt:P2047 ?duration. }
       OPTIONAL { ?item wdt:P18 ?image. }
+      OPTIONAL { ?item wdt:P1657 ?contentRating. }
       SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
     } LIMIT 30`;
 
@@ -122,6 +164,7 @@ async function searchWikidata(titleQuery: string): Promise<MovieResult[]> {
       title: row.itemLabel.value,
       year: row.date?.value?.slice(0, 4) ?? "",
       runtime: Number.isInteger(minutes) && minutes >= 1 && minutes <= 600 ? minutes : null,
+      contentRating: row.contentRatingLabel?.value,
       poster: commonsPoster(row.image?.value),
     };
     const current = byId.get(id);
@@ -131,6 +174,7 @@ async function searchWikidata(titleQuery: string): Promise<MovieResult[]> {
     }
     if (movie.year && (!current.year || movie.year < current.year)) current.year = movie.year;
     if (movie.runtime && (!current.runtime || movie.runtime < current.runtime)) current.runtime = movie.runtime;
+    if (!current.contentRating && movie.contentRating) current.contentRating = movie.contentRating;
     if (!current.poster && movie.poster) current.poster = movie.poster;
   }
   return Array.from(byId.values());
@@ -144,6 +188,7 @@ export async function GET(request: Request) {
   const searches = await Promise.allSettled([
     searchImdb(titleQuery),
     searchWikidata(titleQuery),
+    searchApple(titleQuery),
   ]);
   const candidates = searches.flatMap((result) => result.status === "fulfilled" ? result.value : []);
   const normalizedQuery = clean(titleQuery);
@@ -156,6 +201,7 @@ export async function GET(request: Request) {
     unique.set(key, current ? {
       ...current,
       runtime: current.runtime ?? movie.runtime,
+      contentRating: current.contentRating ?? movie.contentRating,
       poster: current.poster ?? movie.poster,
     } : movie);
   }

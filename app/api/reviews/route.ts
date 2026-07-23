@@ -10,6 +10,7 @@ type ReviewRow = {
   release_year: string;
   genre: string;
   runtime: number;
+  content_rating: string;
   rating_tenths: number;
   blurb: string;
   review_text: string;
@@ -33,6 +34,7 @@ async function database() {
     release_year TEXT NOT NULL DEFAULT '',
     genre TEXT NOT NULL,
     runtime INTEGER NOT NULL,
+    content_rating TEXT NOT NULL DEFAULT '',
     rating_tenths INTEGER NOT NULL,
     blurb TEXT NOT NULL,
     review_text TEXT NOT NULL,
@@ -51,6 +53,7 @@ async function database() {
     ["rewatch_odds", `ALTER TABLE reviews ADD COLUMN rewatch_odds TEXT NOT NULL DEFAULT ''`],
     ["watch_party", `ALTER TABLE reviews ADD COLUMN watch_party TEXT NOT NULL DEFAULT ''`],
     ["sleep_risk", `ALTER TABLE reviews ADD COLUMN sleep_risk TEXT NOT NULL DEFAULT ''`],
+    ["content_rating", `ALTER TABLE reviews ADD COLUMN content_rating TEXT NOT NULL DEFAULT ''`],
   ] as const;
   for (const [name, statement] of missingColumns) {
     if (!columns.results.some((column) => column.name === name)) await db.prepare(statement).run();
@@ -67,6 +70,7 @@ function serialize(row: ReviewRow) {
     year: row.release_year,
     genre: row.genre,
     runtime: row.runtime,
+    contentRating: row.content_rating,
     rating: row.rating_tenths / 10,
     blurb: row.blurb,
     reviewText: row.review_text,
@@ -85,7 +89,7 @@ export async function GET() {
   try {
     const db = await database();
     if (!db) return Response.json({ reviews: [] });
-    const result = await db.prepare(`SELECT id, slug, movie_id, title, release_year, genre, runtime,
+    const result = await db.prepare(`SELECT id, slug, movie_id, title, release_year, genre, runtime, content_rating,
       rating_tenths, blurb, review_text, favorite_quote, rewatch_odds, watch_party, sleep_risk,
       poster_key, poster_content_type, published_at
       FROM reviews ORDER BY published_at DESC, id DESC LIMIT 24`).all<ReviewRow>();

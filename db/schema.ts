@@ -53,6 +53,7 @@ export const reviews = sqliteTable("reviews", {
   releaseYear: text("release_year").notNull().default(""),
   genre: text("genre").notNull(),
   runtime: integer("runtime").notNull(),
+  contentRating: text("content_rating").notNull().default(""),
   ratingTenths: integer("rating_tenths").notNull(),
   blurb: text("blurb").notNull(),
   reviewText: text("review_text").notNull(),

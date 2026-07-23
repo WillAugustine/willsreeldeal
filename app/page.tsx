@@ -13,6 +13,7 @@ type Movie = {
   year: string;
   genre?: string;
   runtime?: number;
+  contentRating?: string;
   vibe?: string;
   color?: string;
   rating?: number;
@@ -256,11 +257,11 @@ export default function Home() {
           <p>Short reviews. Strong feelings.<br />Absolutely no homework required.</p>
         </div>
         <div className="review-grid">
-          {reviews.map((movie, index) => (
+          {reviews.map((movie) => (
             <article className="review-card" key={movie.id}>
               <div className="review-card__poster">
                 <Poster movie={movie} />
-                <span className="card-number">{String(index + 1).padStart(2, "0")}</span>
+                <span className="content-rating-badge" aria-label={movie.contentRating ? `Rated ${movie.contentRating}` : "Not rated"}>{movie.contentRating || "NR"}</span>
               </div>
               <div className="review-card__body">
                 <div className="review-card__meta"><span>{movie.genre}</span><span>{movie.runtime} min</span></div>

@@ -49,6 +49,33 @@ test("auto-populates runtime from the selected movie", async () => {
   assert.match(studio, /form\.set\("runtime", runtime\)/);
 });
 
+test("replaces review numbers with auto-filled movie content ratings", async () => {
+  const [searchRoute, studio, studioRoute, publicRoute, home, styles, schema, migration] = await Promise.all([
+    source("app/api/movies/search/route.ts"),
+    source("app/studio/StudioForm.tsx"),
+    source("app/studio/api/reviews/route.ts"),
+    source("app/api/reviews/route.ts"),
+    source("app/page.tsx"),
+    source("app/globals.css"),
+    source("db/schema.ts"),
+    source("drizzle/0005_melodic_lethal_legion.sql"),
+  ]);
+
+  assert.match(searchRoute, /contentAdvisoryRating/);
+  assert.match(searchRoute, /wdt:P1657 \?contentRating/);
+  assert.match(studio, /setContentRating\(movie\.contentRating \?\? ""\)/);
+  assert.match(studio, /Movie rating <span>Auto-filled<\/span>/);
+  assert.match(studio, /form\.set\("contentRating", contentRating\)/);
+  assert.match(studioRoute, /content_rating/);
+  assert.match(publicRoute, /contentRating: row\.content_rating/);
+  assert.match(home, /className="content-rating-badge"/);
+  assert.match(home, /\{movie\.contentRating \|\| "NR"\}/);
+  assert.doesNotMatch(home, /className="card-number"/);
+  assert.match(styles, /\.content-rating-badge/);
+  assert.match(schema, /contentRating: text\("content_rating"\)/);
+  assert.match(migration, /ADD `content_rating`/);
+});
+
 test("lets Will edit previously published studio reviews", async () => {
   const [studio, route, styles] = await Promise.all([
     source("app/studio/StudioForm.tsx"),

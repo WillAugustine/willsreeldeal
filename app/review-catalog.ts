@@ -4,6 +4,7 @@ export type CatalogReview = {
   year: string;
   genre: string;
   runtime: number;
+  contentRating?: string;
   color: string;
   rating: number;
   blurb: string;
@@ -23,6 +24,7 @@ export const fallbackReviews: CatalogReview[] = [
     year: "2025",
     genre: "History / drama",
     runtime: 121,
+    contentRating: "NR",
     color: "#355245",
     rating: 9.2,
     blurb: "So many emotions, all fueled by a spectacular performance by Robert Aramayo.",
@@ -36,6 +38,7 @@ export const fallbackReviews: CatalogReview[] = [
     year: "2015",
     genre: "Drama / comedy",
     runtime: 101,
+    contentRating: "R",
     color: "#596451",
     rating: 7.8,
     blurb: "It’s an interesting take on loss and how it can affect you.",
@@ -49,6 +52,7 @@ export const fallbackReviews: CatalogReview[] = [
     year: "2012",
     genre: "Drama / thriller / crime",
     runtime: 109,
+    contentRating: "R",
     color: "#4b514a",
     rating: 5.9,
     blurb: "Incredibly tough watch - will not watch again.",
@@ -62,6 +66,7 @@ export const fallbackReviews: CatalogReview[] = [
     year: "2009",
     genre: "History / drama",
     runtime: 134,
+    contentRating: "PG-13",
     color: "#755f3f",
     rating: 7.1,
     blurb: "Parts were amazing, parts were meh.",
@@ -75,6 +80,7 @@ export const fallbackReviews: CatalogReview[] = [
     year: "2022",
     genre: "Crime / mystery / thriller",
     runtime: 177,
+    contentRating: "PG-13",
     color: "#3b3030",
     rating: 9.8,
     blurb: "Still badass.",
@@ -88,6 +94,7 @@ export const fallbackReviews: CatalogReview[] = [
     year: "2009",
     genre: "Comedy / Crime / Drama",
     runtime: 108,
+    contentRating: "R",
     color: "#7b713c",
     rating: 6.1,
     blurb: "The plot was interesting and Matt Damon did good, but the comedy gets overplayed.",
@@ -101,6 +108,7 @@ export const fallbackReviews: CatalogReview[] = [
     year: "2023",
     genre: "Drama / history",
     runtime: 112,
+    contentRating: "R",
     color: "#a8623b",
     rating: 8.2,
     blurb: "It doesn’t focus on MJ, but Nike and the people behind the creation of the Air Jordan brand.",
@@ -114,6 +122,7 @@ export const fallbackReviews: CatalogReview[] = [
     year: "2005",
     genre: "Adventure / Comedy / Fantasy",
     runtime: 118,
+    contentRating: "PG-13",
     color: "#584c3d",
     rating: 3.8,
     blurb: "What in the Scooby Doo shit is this?",
@@ -127,6 +136,7 @@ export const fallbackReviews: CatalogReview[] = [
     year: "1993",
     genre: "Adventure / Science Fiction / Thriller",
     runtime: 127,
+    contentRating: "PG-13",
     color: "#574932",
     rating: 9.1,
     blurb: "A classic that still looks so good and completely sucks you into its world.",
@@ -140,6 +150,7 @@ export const fallbackReviews: CatalogReview[] = [
     year: "2014",
     genre: "Comedy / Drama",
     runtime: 114,
+    contentRating: "R",
     color: "#a45235",
     rating: 9.9,
     blurb: "A masterclass by Jon Favreau. Everything about Chef works for me.",
@@ -153,6 +164,7 @@ export const fallbackReviews: CatalogReview[] = [
     year: "2019",
     genre: "Drama / History / War",
     runtime: 140,
+    contentRating: "R",
     color: "#403a31",
     rating: 8.9,
     blurb: "The pacing is slow, but the stunning cinematography more than makes up for it.",
@@ -166,6 +178,7 @@ export const fallbackReviews: CatalogReview[] = [
     year: "2003",
     genre: "Comedy",
     runtime: 118,
+    contentRating: "PG-13",
     color: "#426354",
     rating: 5.8,
     blurb: "It wanted so desperately to be like Step Brothers and barely missed the mark.",
