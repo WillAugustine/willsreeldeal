@@ -394,7 +394,11 @@ export default function Home() {
               <div className="search-results" role="listbox" aria-label="Movie search results">
                 {results.map((movie) => (
                   <button type="button" key={movie.id} onClick={() => { setSelected(movie); setQuery(movie.title); setResults([]); }}>
-                    <span className="result-dot" /> <strong>{movie.title}</strong> <small>{movie.year || "Year unknown"}</small>
+                    <span className={`search-result-art ${movie.poster ? "search-result-art--poster" : ""}`}>
+                      {movie.poster ? <img src={movie.poster} alt="" referrerPolicy="no-referrer" /> : <span aria-hidden="true">🎬</span>}
+                    </span>
+                    <strong>{movie.title}</strong>
+                    <small>{movie.year || "Year unknown"}</small>
                   </button>
                 ))}
               </div>

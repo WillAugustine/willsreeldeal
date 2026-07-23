@@ -43,7 +43,7 @@ test("auto-populates runtime from the selected movie", async () => {
   ]);
 
   assert.match(searchRoute, /wdt:P2047 \?duration/);
-  assert.match(searchRoute, /runtime: \(\(\) =>/);
+  assert.match(searchRoute, /runtime: Number\.isInteger\(minutes\)/);
   assert.match(studio, /setRuntime\(movie\.runtime \? String\(movie\.runtime\) : ""\)/);
   assert.match(studio, /Runtime <span>Auto-filled<\/span>/);
   assert.match(studio, /form\.set\("runtime", runtime\)/);
@@ -212,6 +212,24 @@ test("starts the request leaderboard empty without demo vote seeding", async () 
   assert.match(home, /useState<Leader\[\]>\(\[\]\)/);
   assert.match(home, /Be the first to pester Will/);
   assert.doesNotMatch(community, /INSERT OR IGNORE INTO movie_requests/);
+});
+
+test("searches a broad live movie catalog with partial matches and poster art", async () => {
+  const [home, searchRoute, styles] = await Promise.all([
+    source("app/page.tsx"),
+    source("app/api/movies/search/route.ts"),
+    source("app/globals.css"),
+  ]);
+
+  assert.match(searchRoute, /v3\.sg\.media-imdb\.com\/suggestion/);
+  assert.match(searchRoute, /parseSearch\(rawQuery\)/);
+  assert.match(searchRoute, /clean\(movie\.title\)\.includes\(normalizedQuery\)/);
+  assert.match(searchRoute, /OPTIONAL \{ \?item wdt:P18 \?image\. \}/);
+  assert.match(searchRoute, /poster: item\.i\?\.imageUrl/);
+  assert.match(home, /movie\.poster \? <img src=\{movie\.poster\}/);
+  assert.match(home, /aria-hidden="true">🎬/);
+  assert.match(styles, /\.search-result-art--poster/);
+  assert.doesNotMatch(home, /<span className="result-dot" \/> <strong>\{movie\.title\}/);
 });
 
 test("connects Reel Mail to Resend with both delivery schedules", async () => {
