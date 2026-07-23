@@ -102,20 +102,23 @@ const fallbackReviews: Movie[] = [
   },
 ];
 
-const moodMovies: Movie[] = [
-  { id: "m1", title: "Palm Springs", year: "2020", genre: "Comedy", runtime: 90, vibe: "easy", color: "#ef7f55", blurb: "Sunny, silly, and sneakily sweet." },
-  { id: "m2", title: "The Nice Guys", year: "2016", genre: "Comedy", runtime: 116, vibe: "chaotic", color: "#d1a02c", blurb: "Two disasters solve one very fun mystery." },
-  { id: "m3", title: "Arrival", year: "2016", genre: "Sci-fi", runtime: 116, vibe: "thoughtful", color: "#527b75", blurb: "Aliens, language, and a respectful amount of feelings." },
-  { id: "m4", title: "Mad Max: Fury Road", year: "2015", genre: "Action", runtime: 120, vibe: "chaotic", color: "#c9502f", blurb: "Two hours of shouting ‘that was cool.’" },
-  { id: "m5", title: "Knives Out", year: "2019", genre: "Mystery", runtime: 131, vibe: "clever", color: "#765c9c", blurb: "A cozy murder and one spectacular sweater." },
-  { id: "m6", title: "The Holdovers", year: "2023", genre: "Drama", runtime: 133, vibe: "cozy", color: "#8b6436", blurb: "Grumpy people slowly become less grumpy." },
-  { id: "m7", title: "Game Night", year: "2018", genre: "Comedy", runtime: 100, vibe: "easy", color: "#316f66", blurb: "Competitive friends make several poor choices." },
-  { id: "m8", title: "Annihilation", year: "2018", genre: "Sci-fi", runtime: 115, vibe: "weird", color: "#775890", blurb: "Beautiful plants. Terrible bear. No notes." },
-  { id: "m9", title: "Dungeons & Dragons: Honor Among Thieves", year: "2023", genre: "Fantasy", runtime: 134, vibe: "easy", color: "#be6a35", blurb: "A charming quest with excellent idiot energy." },
-  { id: "m10", title: "Talk to Me", year: "2022", genre: "Horror", runtime: 95, vibe: "intense", color: "#344440", blurb: "Teenagers discover a hand and zero good judgment." },
-  { id: "m11", title: "Ocean’s Eleven", year: "2001", genre: "Crime", runtime: 116, vibe: "clever", color: "#5f7143", blurb: "Cool people make crime look alarmingly organized." },
-  { id: "m12", title: "The Wild Robot", year: "2024", genre: "Animation", runtime: 102, vibe: "cozy", color: "#418a6c", blurb: "A robot, a goose, and an ambush of emotions." },
-];
+const genreFilters = ["Comedy", "Action", "Sci-fi", "Mystery", "Drama", "Fantasy", "Horror", "Animation", "Crime", "Thriller", "History"];
+
+function matchesGenre(movie: Movie, genre: string) {
+  return genre === "Surprise me" || movie.genre?.toLowerCase().includes(genre.toLowerCase());
+}
+
+function matchesVibe(movie: Movie, vibe: string) {
+  const genres = movie.genre?.toLowerCase() ?? "";
+  const vibeGenres: Record<string, string[]> = {
+    easy: ["comedy", "animation", "family", "romance"],
+    clever: ["mystery", "sci-fi", "crime", "history"],
+    chaotic: ["action", "thriller", "horror"],
+    cozy: ["animation", "comedy", "romance", "family"],
+    intense: ["thriller", "crime", "horror", "drama"],
+  };
+  return vibeGenres[vibe]?.some((item) => genres.includes(item)) ?? false;
+}
 
 function Poster({ movie, compact = false }: { movie: Movie; compact?: boolean }) {
   const artwork = movie.poster;
@@ -201,14 +204,26 @@ export default function Home() {
 
   const topFive = useMemo(() => {
     const maxRuntime = runtime === "short" ? 100 : runtime === "medium" ? 125 : runtime === "long" ? 999 : 999;
-    const exact = moodMovies.filter((movie) => (genre === "Surprise me" || movie.genre === genre) && (movie.runtime ?? 0) <= maxRuntime);
-    const expanded = [...exact, ...moodMovies.filter((movie) => !exact.includes(movie) && (movie.runtime ?? 0) <= maxRuntime)];
-    return expanded
-      .map((movie) => ({ movie, score: (movie.vibe === vibe ? 3 : 0) + (genre === movie.genre ? 2 : 0) + (runtime === "any" ? 1 : 0) }))
+    const withinRuntime = reviews.filter((movie) => (movie.runtime ?? 0) <= maxRuntime);
+    const watchedPool = withinRuntime.length ? withinRuntime : reviews;
+    return watchedPool
+      .map((movie) => ({
+        movie,
+        score:
+          (matchesVibe(movie, vibe) ? 4 : 0) +
+          (matchesGenre(movie, genre) ? 3 : 0) +
+          ((movie.rating ?? 0) / 10) +
+          (runtime === "any" ? 1 : 0),
+      }))
       .sort((a, b) => b.score - a.score || a.movie.title.localeCompare(b.movie.title))
       .slice(0, 5)
       .map(({ movie }) => movie);
-  }, [genre, runtime, vibe]);
+  }, [genre, reviews, runtime, vibe]);
+
+  const availableGenres = useMemo(
+    () => ["Surprise me", ...genreFilters.filter((item) => reviews.some((movie) => matchesGenre(movie, item)))],
+    [reviews],
+  );
 
   async function submitNewsletter(event: FormEvent) {
     event.preventDefault();
@@ -258,7 +273,7 @@ export default function Home() {
         </a>
         <nav aria-label="Main navigation">
           <a href="#reviews">The takes</a>
-          <a href="#picker">Pick my movie</a>
+          <a href="#picker">Will’s picks</a>
           <a href="#request">Pester Will</a>
           <a href="https://letterboxd.com/foodiefrank/" target="_blank" rel="noopener">Letterboxd ↗</a>
         </nav>
@@ -335,15 +350,15 @@ export default function Home() {
 
       <section className="picker section" id="picker">
         <div className="picker__intro">
-          <p className="kicker">02 · The Mood-to-Movie Machine</p>
-          <h2>Tell me your vibe.<br /><em>I’ll bring five.</em></h2>
-          <p>Three tiny questions. Five face-value picks. One less hour lost to scrolling.</p>
+          <p className="kicker">02 · Will’s Watched List</p>
+          <h2>Tell Will your vibe.<br /><em>He’ll bring five.</em></h2>
+          <p>Every suggestion comes only from movies I have actually watched and reviewed. Three tiny questions. One less hour lost to scrolling.</p>
         </div>
         <div className="picker__panel">
           <fieldset>
             <legend><span>1</span> What sounds good?</legend>
             <div className="chips">
-              {["Surprise me", "Comedy", "Action", "Sci-fi", "Mystery", "Drama", "Fantasy", "Horror", "Animation", "Crime"].map((item) => (
+              {availableGenres.map((item) => (
                 <button className={genre === item ? "active" : ""} type="button" onClick={() => setGenre(item)} key={item}>{item}</button>
               ))}
             </div>
@@ -364,11 +379,11 @@ export default function Home() {
               ))}
             </div>
           </fieldset>
-          <button className="button button--lime button--wide" type="button" onClick={() => setRecommendations(topFive)}>Spin the movie wheel <span>→</span></button>
+          <button className="button button--lime button--wide" type="button" onClick={() => setRecommendations(topFive)}>Give me Will’s picks <span>→</span></button>
         </div>
         {recommendations.length > 0 && (
           <div className="results-panel" aria-live="polite">
-            <div className="results-panel__heading"><p className="kicker">Your top five</p><h3>Tonight’s couch candidates</h3></div>
+            <div className="results-panel__heading"><p className="kicker">Straight from Will’s watch history</p><h3>Will’s picks for tonight</h3></div>
             <div className="results-list">
               {recommendations.map((movie, index) => (
                 <article key={movie.id}>

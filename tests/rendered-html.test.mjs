@@ -108,3 +108,13 @@ test("connects Reel Mail to Resend with both delivery schedules", async () => {
   assert.deepEqual(wrangler.triggers.crons, ["0 17 * * FRI"]);
   assert.equal(wrangler.vars.NEWSLETTER_SITE_URL, "https://willsreeldeal.com");
 });
+
+test("builds personal suggestions only from Will's reviewed movies", async () => {
+  const home = await source("app/page.tsx");
+
+  assert.match(home, /watchedPool = withinRuntime\.length \? withinRuntime : reviews/);
+  assert.match(home, /Every suggestion comes only from movies I have actually watched and reviewed/);
+  assert.match(home, /Will’s picks for tonight/);
+  assert.doesNotMatch(home, /const moodMovies/);
+  assert.doesNotMatch(home, /title: "Palm Springs"/);
+});
