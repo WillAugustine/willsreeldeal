@@ -18,7 +18,7 @@ test("keeps poster selection inside Will's review studio", async () => {
   assert.match(home, /fetch\("\/api\/reviews"\)/);
   assert.match(studio, /type="file"/);
   assert.match(studio, /accept="image\/jpeg,image\/png,image\/webp"/);
-  assert.match(studio, /fetch\("\/studio\/api\/reviews", \{ method: "POST"/);
+  assert.match(studio, /fetch\("\/studio\/api\/reviews", \{ method: editingId \? "PUT" : "POST"/);
 });
 
 test("uses a typo-proof genre checklist for new reviews", async () => {
@@ -49,6 +49,27 @@ test("auto-populates runtime from the selected movie", async () => {
   assert.match(studio, /form\.set\("runtime", runtime\)/);
 });
 
+test("lets Will edit previously published studio reviews", async () => {
+  const [studio, route, styles] = await Promise.all([
+    source("app/studio/StudioForm.tsx"),
+    source("app/studio/api/reviews/route.ts"),
+    source("app/globals.css"),
+  ]);
+
+  assert.match(studio, /Published reviews/);
+  assert.match(studio, /fetch\("\/studio\/api\/reviews"\)/);
+  assert.match(studio, /method: editingId \? "PUT" : "POST"/);
+  assert.match(studio, /required=\{!editingId\}/);
+  assert.match(studio, /Save the tune-up/);
+  assert.match(route, /export async function GET\(\)/);
+  assert.match(route, /export async function PUT\(request: Request\)/);
+  assert.match(route, /UPDATE reviews SET/);
+  assert.match(route, /fallbackReviews\.find/);
+  assert.match(route, /posterContentType = replacementPoster\?\.type \|\| "external\/url"/);
+  assert.match(route, /replacementPosterKey \|\| existing\.poster_key/);
+  assert.match(styles, /\.studio-review-library/);
+});
+
 test("configures persistent review records and poster storage", async () => {
   const [schema, route, config, auth] = await Promise.all([
     source("db/schema.ts"),
@@ -58,7 +79,8 @@ test("configures persistent review records and poster storage", async () => {
   ]);
 
   assert.match(schema, /sqliteTable\("reviews"/);
-  assert.match(route, /POSTERS\.put/);
+  assert.match(route, /bucket\.put/);
+  assert.match(route, /storePoster\(runtimeEnv\.POSTERS/);
   assert.match(route, /movieId.*title/s);
   const wrangler = JSON.parse(config);
   assert.equal(wrangler.d1_databases[0].binding, "DB");
@@ -78,28 +100,32 @@ test("contains no em dashes in visitor or studio copy", async () => {
 });
 
 test("uses real Letterboxd reviews without Netflix links", async () => {
-  const [home, affiliateRoute] = await Promise.all([
+  const [home, catalog, affiliateRoute] = await Promise.all([
     source("app/page.tsx"),
+    source("app/review-catalog.ts"),
     source("app/go/[provider]/route.ts"),
   ]);
 
   assert.match(home, /letterboxd\.com\/foodiefrank/);
-  assert.match(home, /title: "I Swear"/);
-  assert.match(home, /title: "The Batman"/);
-  assert.match(home, /title: "Jurassic Park"/);
-  assert.match(home, /title: "Chef"/);
-  assert.match(home, /title: "Stuck on You"/);
+  assert.match(catalog, /title: "I Swear"/);
+  assert.match(catalog, /title: "The Batman"/);
+  assert.match(catalog, /title: "Jurassic Park"/);
+  assert.match(catalog, /title: "Chef"/);
+  assert.match(catalog, /title: "Stuck on You"/);
   assert.doesNotMatch(home, /netflix/i);
   assert.doesNotMatch(affiliateRoute, /netflix/i);
 });
 
 test("shows decimal ratings, the 1-10 scale, and the latest-watch label", async () => {
-  const home = await source("app/page.tsx");
+  const [home, catalog] = await Promise.all([
+    source("app/page.tsx"),
+    source("app/review-catalog.ts"),
+  ]);
 
   assert.match(home, /Will’s latest watch/);
   assert.doesNotMatch(home, /Will’s pick of the week/);
-  assert.match(home, /rating: 9\.2/);
-  assert.match(home, /rating: 7\.8/);
+  assert.match(catalog, /rating: 9\.2/);
+  assert.match(catalog, /rating: 7\.8/);
   assert.match(home, /rating\.toFixed\(1\)/);
   assert.match(home, /\["1", "Abysmal"/);
   assert.match(home, /\["10", "Masterpiece"/);

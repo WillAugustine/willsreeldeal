@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { getStudioOwner } from "../../../studio-auth";
 import { sendInstantReview } from "../../../newsletter-service";
 import { formatReviewGenres, parseReviewGenres } from "../../../genres";
+import { fallbackReviews } from "../../../review-catalog";
 
 type RuntimeEnv = {
   DB?: D1Database;
@@ -24,8 +25,24 @@ type ReviewRow = {
   blurb: string;
   review_text: string;
   poster_key: string;
+  poster_content_type: string;
   published_at: string;
 };
+
+type ReviewFields = {
+  movieId: string;
+  title: string;
+  releaseYear: string;
+  genre: string;
+  runtime: number;
+  rating: number;
+  blurb: string;
+  reviewText: string;
+};
+
+const reviewColumns = `id, slug, movie_id, title, release_year, genre, runtime,
+  rating_tenths, blurb, review_text, poster_key, poster_content_type, published_at`;
+const allowedPosterTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 async function database() {
   const db = (env as unknown as RuntimeEnv).DB;
@@ -61,8 +78,26 @@ function serialize(row: ReviewRow) {
     rating: row.rating_tenths / 10,
     blurb: row.blurb,
     reviewText: row.review_text,
-    poster: `/api/posters/${encodeURIComponent(row.poster_key)}`,
+    poster: row.poster_content_type === "external/url"
+      ? row.poster_key
+      : `/api/posters/${encodeURIComponent(row.poster_key)}`,
     publishedAt: row.published_at,
+  };
+}
+
+function serializeCatalogReview(review: typeof fallbackReviews[number]) {
+  return {
+    id: review.id,
+    movieId: review.id,
+    title: review.title,
+    year: review.year,
+    genre: review.genre,
+    runtime: review.runtime,
+    rating: review.rating,
+    blurb: review.blurb,
+    reviewText: review.reviewText,
+    poster: review.poster,
+    publishedAt: "",
   };
 }
 
@@ -72,6 +107,71 @@ function textField(form: FormData, name: string) {
 
 function slugify(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "movie";
+}
+
+function reviewFields(form: FormData): ReviewFields {
+  const genres = parseReviewGenres(textField(form, "genre"));
+  return {
+    movieId: textField(form, "movieId"),
+    title: textField(form, "title"),
+    releaseYear: textField(form, "year"),
+    genre: formatReviewGenres(genres),
+    runtime: Number(textField(form, "runtime")),
+    rating: Number(textField(form, "rating")),
+    blurb: textField(form, "blurb"),
+    reviewText: textField(form, "reviewText"),
+  };
+}
+
+function reviewError(fields: ReviewFields, minimumReviewLength = 40) {
+  if (!fields.movieId || !fields.title) return "Select a movie from the search results.";
+  if (!fields.genre || !Number.isInteger(fields.runtime) || fields.runtime < 1 || fields.runtime > 600) {
+    return "Pick at least one listed genre and add a valid runtime.";
+  }
+  if (!Number.isFinite(fields.rating) || fields.rating < 0 || fields.rating > 10) {
+    return "The Will-o-Meter needs a score from 0 to 10.";
+  }
+  if (fields.blurb.length < 10 || fields.reviewText.length < minimumReviewLength) {
+    return minimumReviewLength === 40
+      ? "Add a quick take and at least 40 characters for the full review."
+      : "Add a quick take and a full review.";
+  }
+  return "";
+}
+
+function posterError(poster: File) {
+  if (!allowedPosterTypes.has(poster.type)) return "Use a JPG, PNG, or WebP poster.";
+  if (poster.size > 8 * 1024 * 1024) return "Keep the poster under 8 MB.";
+  return "";
+}
+
+async function storePoster(bucket: R2Bucket, poster: File) {
+  const extension = poster.type === "image/png" ? "png" : poster.type === "image/webp" ? "webp" : "jpg";
+  const posterKey = `${crypto.randomUUID()}.${extension}`;
+  await bucket.put(posterKey, await poster.arrayBuffer(), {
+    httpMetadata: { contentType: poster.type, cacheControl: "public, max-age=31536000, immutable" },
+  });
+  return posterKey;
+}
+
+export async function GET() {
+  const owner = await getStudioOwner();
+  if (!owner) return Response.json({ error: "This screening room is Will-only." }, { status: 403 });
+
+  try {
+    const db = await database();
+    if (!db) return Response.json({ error: "Review storage is unavailable." }, { status: 503 });
+    const result = await db.prepare(`SELECT ${reviewColumns}
+      FROM reviews ORDER BY published_at DESC, id DESC LIMIT 100`).all<ReviewRow>();
+    const savedMovieIds = new Set(result.results.map((review) => review.movie_id));
+    const savedTitles = new Set(result.results.map((review) => review.title.toLowerCase()));
+    const catalogReviews = fallbackReviews
+      .filter((review) => !savedMovieIds.has(review.id) && !savedTitles.has(review.title.toLowerCase()))
+      .map(serializeCatalogReview);
+    return Response.json({ reviews: [...result.results.map(serialize), ...catalogReviews] });
+  } catch {
+    return Response.json({ error: "The review archive would not open." }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
@@ -85,40 +185,38 @@ export async function POST(request: Request) {
   let posterKey = "";
   try {
     const form = await request.formData();
-    const movieId = textField(form, "movieId");
-    const title = textField(form, "title");
-    const releaseYear = textField(form, "year");
-    const genres = parseReviewGenres(textField(form, "genre"));
-    const genre = formatReviewGenres(genres);
-    const runtime = Number(textField(form, "runtime"));
-    const rating = Number(textField(form, "rating"));
-    const blurb = textField(form, "blurb");
-    const reviewText = textField(form, "reviewText");
+    const fields = reviewFields(form);
     const poster = form.get("poster");
 
-    if (!movieId || !title) return Response.json({ error: "Select a movie from the search results." }, { status: 400 });
-    if (!genre || !Number.isInteger(runtime) || runtime < 1 || runtime > 600) return Response.json({ error: "Pick at least one listed genre and add a valid runtime." }, { status: 400 });
-    if (!Number.isFinite(rating) || rating < 0 || rating > 10) return Response.json({ error: "The Will-o-Meter needs a score from 0 to 10." }, { status: 400 });
-    if (blurb.length < 10 || reviewText.length < 40) return Response.json({ error: "Add a quick take and at least 40 characters for the full review." }, { status: 400 });
+    const fieldError = reviewError(fields);
+    if (fieldError) return Response.json({ error: fieldError }, { status: 400 });
     if (!(poster instanceof File) || poster.size === 0) return Response.json({ error: "Upload one poster image." }, { status: 400 });
-    if (!new Set(["image/jpeg", "image/png", "image/webp"]).has(poster.type)) return Response.json({ error: "Use a JPG, PNG, or WebP poster." }, { status: 400 });
-    if (poster.size > 8 * 1024 * 1024) return Response.json({ error: "Keep the poster under 8 MB." }, { status: 400 });
+    const invalidPoster = posterError(poster);
+    if (invalidPoster) return Response.json({ error: invalidPoster }, { status: 400 });
 
-    const extension = poster.type === "image/png" ? "png" : poster.type === "image/webp" ? "webp" : "jpg";
-    const slug = `${slugify(title)}-${releaseYear || "film"}-${Date.now().toString(36)}`;
-    posterKey = `${crypto.randomUUID()}.${extension}`;
-    await runtimeEnv.POSTERS.put(posterKey, await poster.arrayBuffer(), {
-      httpMetadata: { contentType: poster.type, cacheControl: "public, max-age=31536000, immutable" },
-    });
+    const slug = `${slugify(fields.title)}-${fields.releaseYear || "film"}-${Date.now().toString(36)}`;
+    posterKey = await storePoster(runtimeEnv.POSTERS, poster);
 
     const result = await db.prepare(`INSERT INTO reviews
       (slug, movie_id, title, release_year, genre, runtime, rating_tenths, blurb, review_text, poster_key, poster_content_type, created_by)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(slug, movieId, title, releaseYear, genre, runtime, Math.round(rating * 10), blurb, reviewText, posterKey, poster.type, owner.email)
+      .bind(
+        slug,
+        fields.movieId,
+        fields.title,
+        fields.releaseYear,
+        fields.genre,
+        fields.runtime,
+        Math.round(fields.rating * 10),
+        fields.blurb,
+        fields.reviewText,
+        posterKey,
+        poster.type,
+        owner.email,
+      )
       .run();
 
-    const created = await db.prepare(`SELECT id, slug, movie_id, title, release_year, genre, runtime,
-      rating_tenths, blurb, review_text, poster_key, published_at FROM reviews WHERE id = ?`)
+    const created = await db.prepare(`SELECT ${reviewColumns} FROM reviews WHERE id = ?`)
       .bind(result.meta.last_row_id)
       .first<ReviewRow>();
     const newsletter = created
@@ -128,5 +226,104 @@ export async function POST(request: Request) {
   } catch {
     if (posterKey) await runtimeEnv.POSTERS.delete(posterKey).catch(() => undefined);
     return Response.json({ error: "The projector jammed. Your review was not published." }, { status: 500 });
+  }
+}
+
+export async function PUT(request: Request) {
+  const owner = await getStudioOwner();
+  if (!owner) return Response.json({ error: "This screening room is Will-only." }, { status: 403 });
+
+  const runtimeEnv = env as unknown as RuntimeEnv;
+  const db = await database();
+  if (!db || !runtimeEnv.POSTERS) return Response.json({ error: "Publishing storage is unavailable." }, { status: 503 });
+
+  let replacementPosterKey = "";
+  try {
+    const form = await request.formData();
+    const reviewIdentifier = textField(form, "reviewId");
+    const numericReviewMatch = reviewIdentifier.match(/^review-(\d+)$/);
+    const reviewId = numericReviewMatch ? Number(numericReviewMatch[1]) : 0;
+    const catalogReview = fallbackReviews.find((review) => review.id === reviewIdentifier);
+    const fields = reviewFields(form);
+    const poster = form.get("poster");
+    const replacementPoster = poster instanceof File && poster.size > 0 ? poster : null;
+
+    if ((!Number.isInteger(reviewId) || reviewId < 1) && !catalogReview) {
+      return Response.json({ error: "Choose a published review to edit." }, { status: 400 });
+    }
+    const fieldError = reviewError(fields, 1);
+    if (fieldError) return Response.json({ error: fieldError }, { status: 400 });
+    if (replacementPoster) {
+      const invalidPoster = posterError(replacementPoster);
+      if (invalidPoster) return Response.json({ error: invalidPoster }, { status: 400 });
+    }
+
+    if (catalogReview) {
+      if (replacementPoster) replacementPosterKey = await storePoster(runtimeEnv.POSTERS, replacementPoster);
+      const posterKey = replacementPosterKey || catalogReview.poster;
+      const posterContentType = replacementPoster?.type || "external/url";
+      const slug = `${slugify(fields.title)}-${fields.releaseYear || "film"}-${Date.now().toString(36)}`;
+      const result = await db.prepare(`INSERT INTO reviews
+        (slug, movie_id, title, release_year, genre, runtime, rating_tenths, blurb, review_text, poster_key, poster_content_type, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(
+          slug,
+          fields.movieId,
+          fields.title,
+          fields.releaseYear,
+          fields.genre,
+          fields.runtime,
+          Math.round(fields.rating * 10),
+          fields.blurb,
+          fields.reviewText,
+          posterKey,
+          posterContentType,
+          owner.email,
+        )
+        .run();
+      const created = await db.prepare(`SELECT ${reviewColumns} FROM reviews WHERE id = ?`)
+        .bind(result.meta.last_row_id)
+        .first<ReviewRow>();
+      return Response.json({ ok: true, review: created ? serialize(created) : null });
+    }
+
+    const existing = await db.prepare(`SELECT ${reviewColumns} FROM reviews WHERE id = ?`)
+      .bind(reviewId)
+      .first<ReviewRow>();
+    if (!existing) return Response.json({ error: "That review is no longer in the archive." }, { status: 404 });
+
+    if (replacementPoster) replacementPosterKey = await storePoster(runtimeEnv.POSTERS, replacementPoster);
+    const posterKey = replacementPosterKey || existing.poster_key;
+    const posterContentType = replacementPoster?.type || existing.poster_content_type;
+
+    await db.prepare(`UPDATE reviews SET
+      movie_id = ?, title = ?, release_year = ?, genre = ?, runtime = ?, rating_tenths = ?,
+      blurb = ?, review_text = ?, poster_key = ?, poster_content_type = ?
+      WHERE id = ?`)
+      .bind(
+        fields.movieId,
+        fields.title,
+        fields.releaseYear,
+        fields.genre,
+        fields.runtime,
+        Math.round(fields.rating * 10),
+        fields.blurb,
+        fields.reviewText,
+        posterKey,
+        posterContentType,
+        reviewId,
+      )
+      .run();
+
+    const updated = await db.prepare(`SELECT ${reviewColumns} FROM reviews WHERE id = ?`)
+      .bind(reviewId)
+      .first<ReviewRow>();
+    if (replacementPosterKey && existing.poster_content_type !== "external/url") {
+      await runtimeEnv.POSTERS.delete(existing.poster_key).catch(() => undefined);
+    }
+    return Response.json({ ok: true, review: updated ? serialize(updated) : null });
+  } catch {
+    if (replacementPosterKey) await runtimeEnv.POSTERS.delete(replacementPosterKey).catch(() => undefined);
+    return Response.json({ error: "The projector jammed. Your changes were not saved." }, { status: 500 });
   }
 }

@@ -1,9 +1,22 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { formatReviewGenres, REVIEW_GENRES } from "../genres";
+import { formatReviewGenres, parseReviewGenres, REVIEW_GENRES } from "../genres";
 
 type Movie = { id: string; title: string; year: string; runtime: number | null };
+type PublishedReview = {
+  id: string;
+  movieId: string;
+  title: string;
+  year: string;
+  genre: string;
+  runtime: number;
+  rating: number;
+  blurb: string;
+  reviewText: string;
+  poster: string;
+  publishedAt: string;
+};
 
 export default function StudioForm() {
   const [query, setQuery] = useState("");
@@ -13,9 +26,16 @@ export default function StudioForm() {
   const [posterPreview, setPosterPreview] = useState("");
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [runtime, setRuntime] = useState("");
+  const [rating, setRating] = useState("");
+  const [blurb, setBlurb] = useState("");
+  const [reviewText, setReviewText] = useState("");
   const [message, setMessage] = useState("");
   const [publishing, setPublishing] = useState(false);
+  const [reviews, setReviews] = useState<PublishedReview[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(true);
+  const [editingId, setEditingId] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
+  const posterObjectUrl = useRef("");
 
   useEffect(() => {
     if (selected && query === selected.title) return;
@@ -39,9 +59,62 @@ export default function StudioForm() {
     };
   }, [query, selected]);
 
+  useEffect(() => {
+    let active = true;
+    fetch("/studio/api/reviews")
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((data) => {
+        if (active) setReviews(data.reviews ?? []);
+      })
+      .catch(() => {
+        if (active) setMessage("The published review archive could not be loaded.");
+      })
+      .finally(() => {
+        if (active) setLoadingReviews(false);
+      });
+    return () => {
+      active = false;
+      if (posterObjectUrl.current) URL.revokeObjectURL(posterObjectUrl.current);
+    };
+  }, []);
+
   function previewPoster(file?: File) {
-    if (posterPreview) URL.revokeObjectURL(posterPreview);
-    setPosterPreview(file ? URL.createObjectURL(file) : "");
+    if (posterObjectUrl.current) URL.revokeObjectURL(posterObjectUrl.current);
+    posterObjectUrl.current = file ? URL.createObjectURL(file) : "";
+    setPosterPreview(posterObjectUrl.current);
+  }
+
+  function clearEditor(nextMessage = "") {
+    formRef.current?.reset();
+    previewPoster();
+    setEditingId("");
+    setQuery("");
+    setSelected(null);
+    setResults([]);
+    setSelectedGenres([]);
+    setRuntime("");
+    setRating("");
+    setBlurb("");
+    setReviewText("");
+    setMessage(nextMessage);
+  }
+
+  function editReview(review: PublishedReview) {
+    formRef.current?.reset();
+    if (posterObjectUrl.current) URL.revokeObjectURL(posterObjectUrl.current);
+    posterObjectUrl.current = "";
+    setEditingId(review.id);
+    setSelected({ id: review.movieId, title: review.title, year: review.year, runtime: review.runtime });
+    setQuery(review.title);
+    setResults([]);
+    setSelectedGenres(parseReviewGenres(review.genre));
+    setRuntime(String(review.runtime));
+    setRating(review.rating.toFixed(1));
+    setBlurb(review.blurb);
+    setReviewText(review.reviewText);
+    setPosterPreview(review.poster);
+    setMessage(`Editing ${review.title}. The current poster stays unless you choose a new one.`);
+    window.setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   }
 
   async function publish(event: FormEvent<HTMLFormElement>) {
@@ -58,19 +131,23 @@ export default function StudioForm() {
     form.set("year", selected.year);
     form.set("genre", formatReviewGenres(selectedGenres));
     form.set("runtime", runtime);
+    if (editingId) form.set("reviewId", editingId);
 
     try {
-      const response = await fetch("/studio/api/reviews", { method: "POST", body: form });
+      const response = await fetch("/studio/api/reviews", { method: editingId ? "PUT" : "POST", body: form });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "Publishing failed.");
-      setMessage(`${selected.title} is live. Excellent work, boss.`);
-      formRef.current?.reset();
-      setQuery("");
-      setSelected(null);
-      setResults([]);
-      setSelectedGenres([]);
-      setRuntime("");
-      previewPoster();
+      if (!response.ok) throw new Error(data.error ?? (editingId ? "Saving failed." : "Publishing failed."));
+      const savedTitle = selected.title;
+      if (data.review) {
+        setReviews((current) => (
+          editingId
+            ? current.map((review) => review.id === editingId ? data.review : review)
+            : [data.review, ...current]
+        ));
+      }
+      clearEditor(editingId
+        ? `${savedTitle} has been updated everywhere. Nice tune-up.`
+        : `${savedTitle} is live. Excellent work, boss.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "The projector jammed. Try again.");
     } finally {
@@ -79,103 +156,138 @@ export default function StudioForm() {
   }
 
   return (
-    <form className="studio-form" onSubmit={publish} ref={formRef}>
-      <div className="studio-form__heading">
-        <span>New review</span>
-        <strong>01</strong>
-      </div>
-
-      <div className="studio-field studio-movie-field">
-        <label htmlFor="studio-movie">Which movie survived Will’s couch?</label>
-        <div className="studio-search">
-          <span>⌕</span>
-          <input id="studio-movie" value={query} onChange={(event) => {
-            const nextQuery = event.target.value;
-            setQuery(nextQuery);
-            if (selected && nextQuery !== selected.title) {
-              setSelected(null);
-              setRuntime("");
-            }
-            if (nextQuery.trim().length < 2) setResults([]);
-          }} placeholder="Search the movie universe" autoComplete="off" required />
-          <i>{searching ? "Searching..." : selected ? "Selected" : "Pick from list"}</i>
+    <div className="studio-workbench">
+      <section className="studio-review-library" aria-labelledby="published-review-heading">
+        <div className="studio-review-library__heading">
+          <div>
+            <span>Previously on Will’s couch</span>
+            <h2 id="published-review-heading">Published reviews</h2>
+          </div>
+          {editingId && <button type="button" onClick={() => clearEditor("Ready for a brand-new take.")}>+ New review</button>}
         </div>
-        {results.length > 0 && !selected && (
-          <div className="studio-search-results">
-            {results.map((movie) => (
-              <button key={movie.id} type="button" onClick={() => {
-                setSelected(movie);
-                setQuery(movie.title);
-                setRuntime(movie.runtime ? String(movie.runtime) : "");
-                setResults([]);
-              }}>
-                <span className="result-dot" />
-                <strong>{movie.title}</strong>
-                <small>{movie.year || "Year unknown"}{movie.runtime ? ` · ${movie.runtime} min` : ""}</small>
-              </button>
+        {loadingReviews ? (
+          <p className="studio-review-library__empty">Opening the review archive...</p>
+        ) : reviews.length ? (
+          <div className="studio-review-list">
+            {reviews.map((review) => (
+              <article className={editingId === review.id ? "is-editing" : ""} key={review.id}>
+                <img src={review.poster} alt="" referrerPolicy="no-referrer" />
+                <div>
+                  <strong>{review.title}</strong>
+                  <span>{review.year} · {review.rating.toFixed(1)}/10</span>
+                </div>
+                <button type="button" onClick={() => editReview(review)} aria-label={`Edit ${review.title}`}>
+                  {editingId === review.id ? "Editing" : "Edit review"}
+                </button>
+              </article>
             ))}
           </div>
+        ) : (
+          <p className="studio-review-library__empty">Reviews published from this studio will appear here, ready for future tune-ups.</p>
         )}
-        {selected && <p className="studio-selected">Locked in: <strong>{selected.title}</strong> ({selected.year}) <button type="button" onClick={() => { setSelected(null); setQuery(""); setRuntime(""); }}>Change</button></p>}
-      </div>
+      </section>
 
-      <fieldset className="studio-field studio-genre-field">
-        <legend>Genres</legend>
-        <p>Pick every genre that fits. The site keeps spelling and formatting consistent.</p>
-        <div className="studio-genre-grid">
-          {REVIEW_GENRES.map((genre) => {
-            const checked = selectedGenres.includes(genre);
-            return (
-              <label className={checked ? "selected" : ""} key={genre}>
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => setSelectedGenres((current) => (
-                    current.includes(genre)
-                      ? current.filter((item) => item !== genre)
-                      : [...current, genre]
-                  ))}
-                />
-                <span>{genre}</span>
-              </label>
-            );
-          })}
+      <form className={`studio-form ${editingId ? "studio-form--editing" : ""}`} onSubmit={publish} ref={formRef}>
+        <div className="studio-form__heading">
+          <span>{editingId ? "Edit published review" : "New review"}</span>
+          <strong>{editingId ? "EDIT" : "01"}</strong>
         </div>
-      </fieldset>
 
-      <div className="studio-form__row studio-form__row--numbers">
-        <div className="studio-field studio-field--small">
-          <label htmlFor="runtime">Runtime <span>Auto-filled</span></label>
-          <div className="input-suffix"><input id="runtime" name="runtime" type="number" min="1" max="600" value={runtime} onChange={(event) => setRuntime(event.target.value)} placeholder="Select a movie" required /><span>MIN</span></div>
+        <div className="studio-field studio-movie-field">
+          <label htmlFor="studio-movie">Which movie survived Will’s couch?</label>
+          <div className="studio-search">
+            <span>⌕</span>
+            <input id="studio-movie" value={query} onChange={(event) => {
+              const nextQuery = event.target.value;
+              setQuery(nextQuery);
+              if (selected && nextQuery !== selected.title) {
+                setSelected(null);
+                setRuntime("");
+              }
+              if (nextQuery.trim().length < 2) setResults([]);
+            }} placeholder="Search the movie universe" autoComplete="off" required />
+            <i>{searching ? "Searching..." : selected ? "Selected" : "Pick from list"}</i>
+          </div>
+          {results.length > 0 && !selected && (
+            <div className="studio-search-results">
+              {results.map((movie) => (
+                <button key={movie.id} type="button" onClick={() => {
+                  setSelected(movie);
+                  setQuery(movie.title);
+                  setRuntime(movie.runtime ? String(movie.runtime) : "");
+                  setResults([]);
+                }}>
+                  <span className="result-dot" />
+                  <strong>{movie.title}</strong>
+                  <small>{movie.year || "Year unknown"}{movie.runtime ? ` · ${movie.runtime} min` : ""}</small>
+                </button>
+              ))}
+            </div>
+          )}
+          {selected && <p className="studio-selected">Locked in: <strong>{selected.title}</strong> ({selected.year}) <button type="button" onClick={() => { setSelected(null); setQuery(""); setRuntime(""); }}>Change</button></p>}
         </div>
-        <div className="studio-field studio-field--small">
-          <label htmlFor="rating">Will-o-Meter</label>
-          <div className="input-suffix"><input id="rating" name="rating" type="number" min="0" max="10" step="0.1" placeholder="8.2" required /><span>/10</span></div>
+
+        <fieldset className="studio-field studio-genre-field">
+          <legend>Genres</legend>
+          <p>Pick every genre that fits. The site keeps spelling and formatting consistent.</p>
+          <div className="studio-genre-grid">
+            {REVIEW_GENRES.map((genre) => {
+              const checked = selectedGenres.includes(genre);
+              return (
+                <label className={checked ? "selected" : ""} key={genre}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => setSelectedGenres((current) => (
+                      current.includes(genre)
+                        ? current.filter((item) => item !== genre)
+                        : [...current, genre]
+                    ))}
+                  />
+                  <span>{genre}</span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+
+        <div className="studio-form__row studio-form__row--numbers">
+          <div className="studio-field studio-field--small">
+            <label htmlFor="runtime">Runtime <span>Auto-filled</span></label>
+            <div className="input-suffix"><input id="runtime" name="runtime" type="number" min="1" max="600" value={runtime} onChange={(event) => setRuntime(event.target.value)} placeholder="Select a movie" required /><span>MIN</span></div>
+          </div>
+          <div className="studio-field studio-field--small">
+            <label htmlFor="rating">Will-o-Meter</label>
+            <div className="input-suffix"><input id="rating" name="rating" type="number" min="0" max="10" step="0.1" value={rating} onChange={(event) => setRating(event.target.value)} placeholder="8.2" required /><span>/10</span></div>
+          </div>
         </div>
-      </div>
 
-      <div className="studio-field">
-        <label htmlFor="blurb">The snack-size take</label>
-        <input id="blurb" name="blurb" minLength={10} maxLength={220} placeholder="One quotable sentence for the review card" required />
-      </div>
+        <div className="studio-field">
+          <label htmlFor="blurb">The snack-size take</label>
+          <input id="blurb" name="blurb" value={blurb} onChange={(event) => setBlurb(event.target.value)} minLength={10} maxLength={220} placeholder="One quotable sentence for the review card" required />
+        </div>
 
-      <div className="studio-field">
-        <label htmlFor="reviewText">The full couch report</label>
-        <textarea id="reviewText" name="reviewText" minLength={40} rows={8} placeholder="Plot, acting, how cool it looked, what dragged, and whether you would watch it again..." required />
-      </div>
+        <div className="studio-field">
+          <label htmlFor="reviewText">The full couch report</label>
+          <textarea id="reviewText" name="reviewText" value={reviewText} onChange={(event) => setReviewText(event.target.value)} minLength={editingId ? 1 : 40} rows={8} placeholder="Plot, acting, how cool it looked, what dragged, and whether you would watch it again..." required />
+        </div>
 
-      <div className="studio-field">
-        <label htmlFor="poster">Poster art</label>
-        <label className={`poster-drop ${posterPreview ? "poster-drop--has-image" : ""}`} htmlFor="poster">
-          {posterPreview ? <img src={posterPreview} alt="Poster preview" /> : <><strong>Drop in the poster</strong><span>Portrait art works best</span><i>Choose image</i></>}
-        </label>
-        <input className="poster-input" id="poster" name="poster" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => previewPoster(event.target.files?.[0])} required />
-      </div>
+        <div className="studio-field">
+          <label htmlFor="poster">Poster art {editingId && <span>Optional when editing</span>}</label>
+          <label className={`poster-drop ${posterPreview ? "poster-drop--has-image" : ""}`} htmlFor="poster">
+            {posterPreview ? <img src={posterPreview} alt="Poster preview" /> : <><strong>Drop in the poster</strong><span>Portrait art works best</span><i>Choose image</i></>}
+          </label>
+          <input className="poster-input" id="poster" name="poster" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => previewPoster(event.target.files?.[0])} required={!editingId} />
+        </div>
 
-      <div className="studio-submit">
-        <p aria-live="polite">{message || "Publishing makes the review visible on the homepage immediately."}</p>
-        <button className="button button--lime" type="submit" disabled={publishing || !selected || selectedGenres.length === 0 || !runtime}>{publishing ? "Publishing..." : "Publish the take"}<span>↗</span></button>
-      </div>
-    </form>
+        <div className="studio-submit">
+          <p aria-live="polite">{message || "Publishing makes the review visible on the homepage immediately."}</p>
+          {editingId && <button className="studio-cancel-edit" type="button" onClick={() => clearEditor("No changes made.")}>Cancel</button>}
+          <button className="button button--lime" type="submit" disabled={publishing || !selected || selectedGenres.length === 0 || !runtime}>
+            {publishing ? "Saving..." : editingId ? "Save the tune-up" : "Publish the take"}<span>↗</span>
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }

@@ -24,9 +24,11 @@ export function formatReviewGenres(genres: string[]) {
 }
 
 export function parseReviewGenres(value: string) {
-  const allowed = new Set<string>(REVIEW_GENRES);
+  const allowed = new Map(REVIEW_GENRES.map((genre) => [genre.toLowerCase(), genre]));
   return value
     .split("/")
     .map((genre) => genre.trim())
-    .filter((genre, index, genres) => allowed.has(genre) && genres.indexOf(genre) === index);
+    .map((genre) => allowed.get(genre.toLowerCase()))
+    .filter((genre): genre is typeof REVIEW_GENRES[number] => Boolean(genre))
+    .filter((genre, index, genres) => genres.indexOf(genre) === index);
 }

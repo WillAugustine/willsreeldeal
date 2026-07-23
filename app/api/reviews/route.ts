@@ -14,6 +14,7 @@ type ReviewRow = {
   blurb: string;
   review_text: string;
   poster_key: string;
+  poster_content_type: string;
   published_at: string;
 };
 
@@ -51,7 +52,9 @@ function serialize(row: ReviewRow) {
     rating: row.rating_tenths / 10,
     blurb: row.blurb,
     reviewText: row.review_text,
-    poster: `/api/posters/${encodeURIComponent(row.poster_key)}`,
+    poster: row.poster_content_type === "external/url"
+      ? row.poster_key
+      : `/api/posters/${encodeURIComponent(row.poster_key)}`,
     publishedAt: row.published_at,
   };
 }
@@ -61,7 +64,7 @@ export async function GET() {
     const db = await database();
     if (!db) return Response.json({ reviews: [] });
     const result = await db.prepare(`SELECT id, slug, movie_id, title, release_year, genre, runtime,
-      rating_tenths, blurb, review_text, poster_key, published_at
+      rating_tenths, blurb, review_text, poster_key, poster_content_type, published_at
       FROM reviews ORDER BY published_at DESC, id DESC LIMIT 24`).all<ReviewRow>();
     return Response.json({ reviews: result.results.map(serialize) });
   } catch {
