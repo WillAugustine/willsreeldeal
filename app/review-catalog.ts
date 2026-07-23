@@ -8,6 +8,7 @@ export type CatalogReview = {
   rating: number;
   blurb: string;
   reviewText: string;
+  favoriteQuote?: string;
   poster: string;
   letterboxdUrl: string;
 };

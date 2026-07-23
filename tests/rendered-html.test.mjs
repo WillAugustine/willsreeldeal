@@ -70,6 +70,29 @@ test("lets Will edit previously published studio reviews", async () => {
   assert.match(styles, /\.studio-review-library/);
 });
 
+test("supports an optional favorite movie quote", async () => {
+  const [studio, studioRoute, publicRoute, home, newsletter, schema, migration] = await Promise.all([
+    source("app/studio/StudioForm.tsx"),
+    source("app/studio/api/reviews/route.ts"),
+    source("app/api/reviews/route.ts"),
+    source("app/page.tsx"),
+    source("app/newsletter-service.ts"),
+    source("db/schema.ts"),
+    source("drizzle/0003_gorgeous_ezekiel_stane.sql"),
+  ]);
+
+  assert.match(studio, /Favorite movie quote <span>Optional<\/span>/);
+  assert.match(studio, /name="favoriteQuote"/);
+  assert.doesNotMatch(studio, /name="favoriteQuote"[^>]*required/);
+  assert.match(studioRoute, /favorite_quote/);
+  assert.match(studioRoute, /fields\.favoriteQuote/);
+  assert.match(publicRoute, /favoriteQuote: row\.favorite_quote/);
+  assert.match(home, /movie\.favoriteQuote && <blockquote className="favorite-quote"/);
+  assert.match(newsletter, /review\.favorite_quote \?/);
+  assert.match(schema, /favoriteQuote: text\("favorite_quote"\)/);
+  assert.match(migration, /ALTER TABLE `reviews` ADD `favorite_quote`/);
+});
+
 test("configures persistent review records and poster storage", async () => {
   const [schema, route, config, auth] = await Promise.all([
     source("db/schema.ts"),

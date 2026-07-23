@@ -13,6 +13,7 @@ type ReviewRow = {
   rating_tenths: number;
   blurb: string;
   review_text: string;
+  favorite_quote: string;
   poster_key: string;
   poster_content_type: string;
   published_at: string;
@@ -32,11 +33,16 @@ async function database() {
     rating_tenths INTEGER NOT NULL,
     blurb TEXT NOT NULL,
     review_text TEXT NOT NULL,
+    favorite_quote TEXT NOT NULL DEFAULT '',
     poster_key TEXT NOT NULL,
     poster_content_type TEXT NOT NULL,
     created_by TEXT NOT NULL,
     published_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`).run();
+  const columns = await db.prepare(`PRAGMA table_info(reviews)`).all<{ name: string }>();
+  if (!columns.results.some((column) => column.name === "favorite_quote")) {
+    await db.prepare(`ALTER TABLE reviews ADD COLUMN favorite_quote TEXT NOT NULL DEFAULT ''`).run();
+  }
   return db;
 }
 
@@ -52,6 +58,7 @@ function serialize(row: ReviewRow) {
     rating: row.rating_tenths / 10,
     blurb: row.blurb,
     reviewText: row.review_text,
+    favoriteQuote: row.favorite_quote,
     poster: row.poster_content_type === "external/url"
       ? row.poster_key
       : `/api/posters/${encodeURIComponent(row.poster_key)}`,
@@ -64,7 +71,7 @@ export async function GET() {
     const db = await database();
     if (!db) return Response.json({ reviews: [] });
     const result = await db.prepare(`SELECT id, slug, movie_id, title, release_year, genre, runtime,
-      rating_tenths, blurb, review_text, poster_key, poster_content_type, published_at
+      rating_tenths, blurb, review_text, favorite_quote, poster_key, poster_content_type, published_at
       FROM reviews ORDER BY published_at DESC, id DESC LIMIT 24`).all<ReviewRow>();
     return Response.json({ reviews: result.results.map(serialize) });
   } catch {

@@ -113,6 +113,9 @@ main { overflow: hidden; }
 .mini-score::after, .mini-score i { content: ""; position: absolute; bottom: 0; left: 0; height: 3px; }
 .mini-score::after { width: 100%; background: #d5d1c1; }
 .mini-score i { background: var(--forest); z-index: 1; }
+.favorite-quote { position: relative; margin: 15px 0 0; border-left: 3px solid var(--orange); background: rgba(233,116,67,.08); padding: 13px 14px 12px; }
+.favorite-quote span { color: #9a4d2c; font-size: 7px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+.favorite-quote p { margin: 6px 0 0; color: #3f594a; font: italic 13px/1.5 Georgia, serif; white-space: pre-line; }
 
 .manifesto { background: var(--lime); padding: 85px max(30px, calc((100vw - 1320px) / 2)); position: relative; }
 .manifesto::after { content: "W"; position: absolute; right: -30px; bottom: -110px; font: italic 900 420px/1 Georgia, serif; color: rgba(11,59,39,.07); transform: rotate(-8deg); }
@@ -264,6 +267,7 @@ footer > p { margin: 0; color: rgba(244,240,223,.53); font-size: 10px; line-heig
 .studio-field > input:not(.poster-input), .studio-field textarea, .input-suffix { width: 100%; border: 1px solid rgba(16,40,28,.27); background: white; color: var(--ink); }
 .studio-field > input:not(.poster-input) { height: 55px; padding: 0 16px; }
 .studio-field textarea { display: block; resize: vertical; min-height: 165px; padding: 16px; font: 14px/1.6 Arial, sans-serif; }
+.studio-field textarea.studio-quote-input { min-height: 92px; font: italic 15px/1.55 Georgia, serif; }
 .studio-field input:focus, .studio-field textarea:focus { outline: 3px solid var(--orange); outline-offset: 2px; }
 .studio-form__row { display: grid; grid-template-columns: 1fr 150px 150px; gap: 12px; }
 .studio-form__row--numbers { grid-template-columns: repeat(2, minmax(150px, 1fr)); }

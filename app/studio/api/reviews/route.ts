@@ -24,6 +24,7 @@ type ReviewRow = {
   rating_tenths: number;
   blurb: string;
   review_text: string;
+  favorite_quote: string;
   poster_key: string;
   poster_content_type: string;
   published_at: string;
@@ -38,10 +39,11 @@ type ReviewFields = {
   rating: number;
   blurb: string;
   reviewText: string;
+  favoriteQuote: string;
 };
 
 const reviewColumns = `id, slug, movie_id, title, release_year, genre, runtime,
-  rating_tenths, blurb, review_text, poster_key, poster_content_type, published_at`;
+  rating_tenths, blurb, review_text, favorite_quote, poster_key, poster_content_type, published_at`;
 const allowedPosterTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 async function database() {
@@ -58,11 +60,16 @@ async function database() {
     rating_tenths INTEGER NOT NULL,
     blurb TEXT NOT NULL,
     review_text TEXT NOT NULL,
+    favorite_quote TEXT NOT NULL DEFAULT '',
     poster_key TEXT NOT NULL,
     poster_content_type TEXT NOT NULL,
     created_by TEXT NOT NULL,
     published_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`).run();
+  const columns = await db.prepare(`PRAGMA table_info(reviews)`).all<{ name: string }>();
+  if (!columns.results.some((column) => column.name === "favorite_quote")) {
+    await db.prepare(`ALTER TABLE reviews ADD COLUMN favorite_quote TEXT NOT NULL DEFAULT ''`).run();
+  }
   return db;
 }
 
@@ -78,6 +85,7 @@ function serialize(row: ReviewRow) {
     rating: row.rating_tenths / 10,
     blurb: row.blurb,
     reviewText: row.review_text,
+    favoriteQuote: row.favorite_quote,
     poster: row.poster_content_type === "external/url"
       ? row.poster_key
       : `/api/posters/${encodeURIComponent(row.poster_key)}`,
@@ -96,6 +104,7 @@ function serializeCatalogReview(review: typeof fallbackReviews[number]) {
     rating: review.rating,
     blurb: review.blurb,
     reviewText: review.reviewText,
+    favoriteQuote: review.favoriteQuote ?? "",
     poster: review.poster,
     publishedAt: "",
   };
@@ -120,6 +129,7 @@ function reviewFields(form: FormData): ReviewFields {
     rating: Number(textField(form, "rating")),
     blurb: textField(form, "blurb"),
     reviewText: textField(form, "reviewText"),
+    favoriteQuote: textField(form, "favoriteQuote"),
   };
 }
 
@@ -136,6 +146,7 @@ function reviewError(fields: ReviewFields, minimumReviewLength = 40) {
       ? "Add a quick take and at least 40 characters for the full review."
       : "Add a quick take and a full review.";
   }
+  if (fields.favoriteQuote.length > 300) return "Keep the favorite quote under 300 characters.";
   return "";
 }
 
@@ -198,8 +209,8 @@ export async function POST(request: Request) {
     posterKey = await storePoster(runtimeEnv.POSTERS, poster);
 
     const result = await db.prepare(`INSERT INTO reviews
-      (slug, movie_id, title, release_year, genre, runtime, rating_tenths, blurb, review_text, poster_key, poster_content_type, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      (slug, movie_id, title, release_year, genre, runtime, rating_tenths, blurb, review_text, favorite_quote, poster_key, poster_content_type, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .bind(
         slug,
         fields.movieId,
@@ -210,6 +221,7 @@ export async function POST(request: Request) {
         Math.round(fields.rating * 10),
         fields.blurb,
         fields.reviewText,
+        fields.favoriteQuote,
         posterKey,
         poster.type,
         owner.email,
@@ -264,8 +276,8 @@ export async function PUT(request: Request) {
       const posterContentType = replacementPoster?.type || "external/url";
       const slug = `${slugify(fields.title)}-${fields.releaseYear || "film"}-${Date.now().toString(36)}`;
       const result = await db.prepare(`INSERT INTO reviews
-        (slug, movie_id, title, release_year, genre, runtime, rating_tenths, blurb, review_text, poster_key, poster_content_type, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        (slug, movie_id, title, release_year, genre, runtime, rating_tenths, blurb, review_text, favorite_quote, poster_key, poster_content_type, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .bind(
           slug,
           fields.movieId,
@@ -276,6 +288,7 @@ export async function PUT(request: Request) {
           Math.round(fields.rating * 10),
           fields.blurb,
           fields.reviewText,
+          fields.favoriteQuote,
           posterKey,
           posterContentType,
           owner.email,
@@ -298,7 +311,7 @@ export async function PUT(request: Request) {
 
     await db.prepare(`UPDATE reviews SET
       movie_id = ?, title = ?, release_year = ?, genre = ?, runtime = ?, rating_tenths = ?,
-      blurb = ?, review_text = ?, poster_key = ?, poster_content_type = ?
+      blurb = ?, review_text = ?, favorite_quote = ?, poster_key = ?, poster_content_type = ?
       WHERE id = ?`)
       .bind(
         fields.movieId,
@@ -309,6 +322,7 @@ export async function PUT(request: Request) {
         Math.round(fields.rating * 10),
         fields.blurb,
         fields.reviewText,
+        fields.favoriteQuote,
         posterKey,
         posterContentType,
         reviewId,

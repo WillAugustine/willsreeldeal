@@ -1,0 +1,1 @@
+ALTER TABLE `reviews` ADD `favorite_quote` text DEFAULT '' NOT NULL;

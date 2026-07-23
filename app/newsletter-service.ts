@@ -25,6 +25,7 @@ type ReviewForEmail = {
   rating_tenths: number;
   blurb: string;
   review_text: string;
+  favorite_quote: string;
   poster_key: string;
   published_at: string;
 };
@@ -275,6 +276,7 @@ function instantEmail(review: ReviewForEmail, runtimeEnv: NewsletterEnv) {
     <img src="${posterUrl}" alt="Poster for ${escapeHtml(review.title)}" width="210" style="display:block;width:210px;max-width:100%;height:auto;margin:0 0 24px;border:0;">
     <p style="margin:0 0 12px;font-size:18px;line-height:1.45;"><strong>Will-o-Meter: ${rating}/10</strong></p>
     <p style="margin:0 0 24px;font:italic 20px/1.45 Georgia,serif;">"${escapeHtml(review.blurb)}"</p>
+    ${review.favorite_quote ? `<div style="margin:0 0 24px;border-left:4px solid #e97443;background:#f7e5da;padding:14px 16px;"><div style="color:#9a4d2c;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;">Favorite line</div><p style="margin:7px 0 0;font:italic 16px/1.5 Georgia,serif;">${escapeHtml(review.favorite_quote)}</p></div>` : ""}
     <a href="${reviewUrl}" style="display:inline-block;background:#d7f15b;color:#10281c;padding:14px 20px;text-decoration:none;font-size:12px;font-weight:900;letter-spacing:.5px;">READ WILL'S FULL TAKE</a>`;
   return {
     subject: `Fresh take: ${review.title} gets a ${rating}/10`,
@@ -290,6 +292,7 @@ function biweeklyEmail(reviews: ReviewForEmail[], runtimeEnv: NewsletterEnv) {
       <div style="color:#49715d;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;">${escapeHtml(review.release_year)} - Will-o-Meter ${rating}/10</div>
       <h2 style="margin:7px 0 8px;font:700 29px/1.05 Georgia,serif;">${escapeHtml(review.title)}</h2>
       <p style="margin:0;font-size:15px;line-height:1.55;">${escapeHtml(review.blurb)}</p>
+      ${review.favorite_quote ? `<p style="margin:12px 0 0;border-left:3px solid #e97443;padding-left:11px;font:italic 14px/1.5 Georgia,serif;">${escapeHtml(review.favorite_quote)}</p>` : ""}
     </td></tr>`;
   }).join("");
   const content = `
@@ -401,7 +404,7 @@ export async function sendBiweeklyDigest(
     .slice(0, 19)
     .replace("T", " ");
   const result = await db.prepare(`SELECT id, slug, title, release_year, rating_tenths, blurb,
-    review_text, poster_key, published_at FROM reviews
+    review_text, favorite_quote, poster_key, published_at FROM reviews
     WHERE published_at >= ? ORDER BY published_at DESC, id DESC`).bind(since).all<ReviewForEmail>();
   const reviews = result.results;
   if (!reviews.length) {

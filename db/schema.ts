@@ -56,6 +56,7 @@ export const reviews = sqliteTable("reviews", {
   ratingTenths: integer("rating_tenths").notNull(),
   blurb: text("blurb").notNull(),
   reviewText: text("review_text").notNull(),
+  favoriteQuote: text("favorite_quote").notNull().default(""),
   posterKey: text("poster_key").notNull(),
   posterContentType: text("poster_content_type").notNull(),
   createdBy: text("created_by").notNull(),

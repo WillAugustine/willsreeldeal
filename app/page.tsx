@@ -18,6 +18,7 @@ type Movie = {
   rating?: number;
   blurb?: string;
   reviewText?: string;
+  favoriteQuote?: string;
   poster?: string;
   letterboxdUrl?: string;
 };
@@ -263,6 +264,7 @@ export default function Home() {
                 <h3>{movie.title}</h3>
                 <p>“{movie.blurb}”</p>
                 <div className="mini-score"><span>Will-o-Meter</span><strong>{formatRating(movie.rating)}</strong><i style={{ width: `${(movie.rating ?? 0) * 10}%` }} /></div>
+                {movie.favoriteQuote && <blockquote className="favorite-quote"><span>Favorite line</span><p>{movie.favoriteQuote}</p></blockquote>}
                 {movie.reviewText && <details className="full-take"><summary>Read Will&apos;s full take</summary><p>{movie.reviewText}</p></details>}
                 {movie.letterboxdUrl && <a className="letterboxd-source" href={movie.letterboxdUrl} target="_blank" rel="noopener">See it on Letterboxd <span>↗</span></a>}
                 <WatchLinks movie={movie} compact />

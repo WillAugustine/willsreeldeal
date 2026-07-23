@@ -14,6 +14,7 @@ type PublishedReview = {
   rating: number;
   blurb: string;
   reviewText: string;
+  favoriteQuote: string;
   poster: string;
   publishedAt: string;
 };
@@ -29,6 +30,7 @@ export default function StudioForm() {
   const [rating, setRating] = useState("");
   const [blurb, setBlurb] = useState("");
   const [reviewText, setReviewText] = useState("");
+  const [favoriteQuote, setFavoriteQuote] = useState("");
   const [message, setMessage] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [reviews, setReviews] = useState<PublishedReview[]>([]);
@@ -96,6 +98,7 @@ export default function StudioForm() {
     setRating("");
     setBlurb("");
     setReviewText("");
+    setFavoriteQuote("");
     setMessage(nextMessage);
   }
 
@@ -112,6 +115,7 @@ export default function StudioForm() {
     setRating(review.rating.toFixed(1));
     setBlurb(review.blurb);
     setReviewText(review.reviewText);
+    setFavoriteQuote(review.favoriteQuote ?? "");
     setPosterPreview(review.poster);
     setMessage(`Editing ${review.title}. The current poster stays unless you choose a new one.`);
     window.setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
@@ -270,6 +274,20 @@ export default function StudioForm() {
         <div className="studio-field">
           <label htmlFor="reviewText">The full couch report</label>
           <textarea id="reviewText" name="reviewText" value={reviewText} onChange={(event) => setReviewText(event.target.value)} minLength={editingId ? 1 : 40} rows={8} placeholder="Plot, acting, how cool it looked, what dragged, and whether you would watch it again..." required />
+        </div>
+
+        <div className="studio-field">
+          <label htmlFor="favoriteQuote">Favorite movie quote <span>Optional</span></label>
+          <textarea
+            className="studio-quote-input"
+            id="favoriteQuote"
+            name="favoriteQuote"
+            value={favoriteQuote}
+            onChange={(event) => setFavoriteQuote(event.target.value)}
+            maxLength={300}
+            rows={3}
+            placeholder="The line you immediately wanted to repeat"
+          />
         </div>
 
         <div className="studio-field">
