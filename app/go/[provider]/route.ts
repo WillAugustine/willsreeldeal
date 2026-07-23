@@ -14,7 +14,6 @@ export async function GET(request: Request, context: { params: Promise<{ provide
   const destinations: Record<string, string> = {
     amazon: `https://www.amazon.com/s?k=${encoded}&i=instant-video${affiliate.AMAZON_ASSOCIATE_TAG ? `&tag=${encodeURIComponent(affiliate.AMAZON_ASSOCIATE_TAG)}` : ""}`,
     apple: `https://tv.apple.com/search?term=${encoded}${affiliate.APPLE_AFFILIATE_TOKEN ? `&at=${encodeURIComponent(affiliate.APPLE_AFFILIATE_TOKEN)}&ct=wills-reel-deal` : ""}`,
-    netflix: `https://www.netflix.com/search?q=${encodeURIComponent(title)}`,
     fandango: `https://www.fandango.com/search?q=${encodeURIComponent(title)}${affiliate.FANDANGO_AFFILIATE_ID ? `&cmp=${encodeURIComponent(affiliate.FANDANGO_AFFILIATE_ID)}` : ""}`,
   };
   return Response.redirect(destinations[provider] ?? "/", 302);

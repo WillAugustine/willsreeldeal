@@ -15,43 +15,89 @@ type Movie = {
   blurb?: string;
   reviewText?: string;
   poster?: string;
+  letterboxdUrl?: string;
 };
 
 type Leader = Movie & { votes: number };
 
 const fallbackReviews: Movie[] = [
   {
-    id: "review-mickey17",
-    title: "Mickey 17",
+    id: "letterboxd-i-swear",
+    title: "I Swear",
     year: "2025",
-    genre: "Sci-fi comedy",
-    runtime: 137,
-    color: "#d34d36",
-    rating: 8.2,
-    blurb: "Robert Pattinson dies for a living. Somehow, the paperwork is the scariest part.",
-    poster: "/posters/mickey-1.jpg",
+    genre: "History / drama",
+    runtime: 121,
+    color: "#355245",
+    rating: 9,
+    blurb: "So many emotions, all fueled by a spectacular performance by Robert Aramayo.",
+    reviewText: "“Sometimes what I say is funny and I even laugh myself, but that’s very different to actively teasing, or mocking, or encouraging people to swear.”\n\nSo many emotions, all fueled by a spectacular performance by Robert Aramayo. It strikes this balance of a biopic, being informative, but being a damn good movie at the core. It’s super cool that, as an extension of Davidson’s attempt to spread awareness of Tourette’s, this movie was born and executed beautifully.",
+    poster: "https://a.ltrbxd.com/resized/alternative-poster/1/1/9/7/8/4/2/p/jm6sHwVMWy1Izk8Mgmjcza6kxMJ-0-600-0-900-crop.jpg?v=3edb3dc630",
+    letterboxdUrl: "https://letterboxd.com/foodiefrank/film/i-swear/",
   },
   {
-    id: "review-conclave",
-    title: "Conclave",
-    year: "2024",
-    genre: "Drama / mystery",
-    runtime: 120,
-    color: "#3b55a3",
-    rating: 8.8,
-    blurb: "Like a group chat with better robes, higher stakes, and Ralph Fiennes.",
-    poster: "/posters/conclave-2.jpg",
+    id: "letterboxd-demolition",
+    title: "Demolition",
+    year: "2015",
+    genre: "Drama / comedy",
+    runtime: 101,
+    color: "#596451",
+    rating: 8,
+    blurb: "It’s an interesting take on loss and how it can affect you.",
+    reviewText: "Although there are some parts that seemingly, in my opinion, don’t mesh well together or belong in the same movie, I enjoyed this. It’s an interesting take on loss and how it can affect you. Not as many raw emotion moments as I would have liked but that is also kind of the point.",
+    poster: "https://a.ltrbxd.com/resized/alternative-poster/2/3/0/8/3/2/p/oz5zHHaaQJru31FS5HgLKK6QWA8-0-600-0-900-crop.jpg?v=44e6bab769",
+    letterboxdUrl: "https://letterboxd.com/foodiefrank/film/demolition/",
   },
   {
-    id: "review-companion",
-    title: "Companion",
-    year: "2025",
-    genre: "Thriller",
-    runtime: 97,
-    color: "#9c4167",
-    rating: 7.7,
-    blurb: "A terrible couples weekend. Great for everyone who did not attend it.",
-    poster: "/posters/companion-3.jpg",
+    id: "letterboxd-end-of-watch",
+    title: "End of Watch",
+    year: "2012",
+    genre: "Drama / thriller / crime",
+    runtime: 109,
+    color: "#4b514a",
+    rating: 6,
+    blurb: "Incredibly tough watch - will not watch again.",
+    reviewText: "I wish they either leaned into the self-filmed part all the way or left it out. Why was everyone else filming? It was a slow burn for a while but vital for setting everything up.\n\nIncredibly tough watch - will not watch again.",
+    poster: "https://a.ltrbxd.com/resized/film-poster/6/3/4/6/2/63462-end-of-watch-0-600-0-900-crop.jpg?v=da5e26db65",
+    letterboxdUrl: "https://letterboxd.com/foodiefrank/film/end-of-watch/",
+  },
+  {
+    id: "letterboxd-invictus",
+    title: "Invictus",
+    year: "2009",
+    genre: "History / drama",
+    runtime: 134,
+    color: "#755f3f",
+    rating: 7,
+    blurb: "Parts were amazing, parts were meh.",
+    reviewText: "Parts were amazing, parts were meh. There are some deeper messages throughout the movie that are powerful and worth a thought. I had a good time learning more about rugby and Nelson Mandela.\n\n#8 of watching every Matt Damon movie in prep for The Odyssey",
+    poster: "https://a.ltrbxd.com/resized/film-poster/3/7/6/0/5/37605-invictus-0-600-0-900-crop.jpg?v=4cf7d9e769",
+    letterboxdUrl: "https://letterboxd.com/foodiefrank/film/invictus/",
+  },
+  {
+    id: "letterboxd-the-batman",
+    title: "The Batman",
+    year: "2022",
+    genre: "Crime / mystery / thriller",
+    runtime: 177,
+    color: "#3b3030",
+    rating: 10,
+    blurb: "Still badass.",
+    reviewText: "Still badass.",
+    poster: "https://a.ltrbxd.com/resized/alternative-poster/3/4/8/9/1/4/p/tdWJFXQZzzI8TIJQ54vLaQ50bW2-0-600-0-900-crop.jpg?v=e5d27db670",
+    letterboxdUrl: "https://letterboxd.com/foodiefrank/film/the-batman/",
+  },
+  {
+    id: "letterboxd-air",
+    title: "Air",
+    year: "2023",
+    genre: "Drama / history",
+    runtime: 112,
+    color: "#a8623b",
+    rating: 8,
+    blurb: "It doesn’t focus on MJ, but Nike and the people behind the creation of the Air Jordan brand.",
+    reviewText: "“I believe the saying that if you say what you want, that’s fine and good, but doing something about it, now… that’s what really counts”\n\nI think Air works really well because it doesn’t focus on MJ, but Nike and the people behind the creation of the Air Jordan brand. I really like Ben Affleck’s directing style in this and with all of the big names in this, it was set up for success.\n\n#6 of watching every Matt Damon movie in prep for The Odyssey",
+    poster: "https://a.ltrbxd.com/resized/alternative-poster/8/6/8/4/9/1/p/iKcnbqhKvlwfF4CnMVlRrYlOvM5-0-600-0-900-crop.jpg?v=781672961f",
+    letterboxdUrl: "https://letterboxd.com/foodiefrank/film/air-2023/",
   },
 ];
 
@@ -82,7 +128,7 @@ function Poster({ movie, compact = false }: { movie: Movie; compact?: boolean })
   const artwork = movie.poster;
   return (
     <div className={`poster ${compact ? "poster--compact" : ""} ${artwork ? "poster--art" : ""}`} style={{ "--poster": movie.color ?? "#3d7654" } as CSSProperties}>
-      {artwork && <img src={artwork} alt={`Original poster artwork for ${movie.title}`} />}
+      {artwork && <img src={artwork} alt={`Poster for ${movie.title}`} referrerPolicy="no-referrer" />}
       <div className="poster__grain" />
       <span className="poster__year">{movie.year}</span>
       <span className="poster__mark">WRD</span>
@@ -97,7 +143,6 @@ function WatchLinks({ movie, compact = false }: { movie: Movie; compact?: boolea
     <div className={`watch-links ${compact ? "watch-links--compact" : ""}`} aria-label={`Where to watch ${movie.title}`}>
       <a href={`/go/amazon${query}`} target="_blank" rel="sponsored noopener">Amazon <span>↗</span></a>
       <a href={`/go/apple${query}`} target="_blank" rel="sponsored noopener">Apple TV <span>↗</span></a>
-      <a href={`/go/netflix${query}`} target="_blank" rel="noopener">Netflix? <span>↗</span></a>
     </div>
   );
 }
@@ -220,6 +265,7 @@ export default function Home() {
           <a href="#reviews">The takes</a>
           <a href="#picker">Pick my movie</a>
           <a href="#request">Pester Will</a>
+          <a href="https://letterboxd.com/foodiefrank/" target="_blank" rel="noopener">Letterboxd ↗</a>
         </nav>
         <a className="button button--small button--cream" href="#newsletter">Get Reel Mail</a>
       </header>
@@ -271,6 +317,7 @@ export default function Home() {
                 <p>“{movie.blurb}”</p>
                 <div className="mini-score"><span>Will-o-Meter</span><strong>{movie.rating}</strong><i style={{ width: `${(movie.rating ?? 0) * 10}%` }} /></div>
                 {movie.reviewText && <details className="full-take"><summary>Read Will&apos;s full take</summary><p>{movie.reviewText}</p></details>}
+                {movie.letterboxdUrl && <a className="letterboxd-source" href={movie.letterboxdUrl} target="_blank" rel="noopener">See it on Letterboxd <span>↗</span></a>}
                 <WatchLinks movie={movie} compact />
               </div>
             </article>
@@ -407,8 +454,8 @@ export default function Home() {
       <footer>
         <a className="brand brand--footer" href="#top"><span className="brand__stamp">W</span><span>Will’s Reel Deal<small>opinions, lightly buttered</small></span></a>
         <p>Made by a movie fan, not a movie critic.<br />© 2026 Will’s Reel Deal</p>
-        <div className="footer-links"><a href="#reviews">Reviews</a><a href="#picker">Find a movie</a><a href="#request">Request one</a><a href="#affiliate-note">Affiliate note</a></div>
-        <p className="affiliate-note" id="affiliate-note"><strong>Keeping the lights dim:</strong> Amazon and Apple links may become affiliate links once Will is approved for their programs. A qualifying purchase may earn a commission at no added cost to you. Netflix currently offers no public affiliate program, so that button is just neighborly.</p>
+        <div className="footer-links"><a href="#reviews">Reviews</a><a href="#picker">Find a movie</a><a href="#request">Request one</a><a href="https://letterboxd.com/foodiefrank/" target="_blank" rel="noopener">Letterboxd ↗</a><a href="#affiliate-note">Affiliate note</a></div>
+        <p className="affiliate-note" id="affiliate-note"><strong>Keeping the lights dim:</strong> Amazon and Apple links may become affiliate links once Will is approved for their programs. A qualifying purchase may earn a commission at no added cost to you.</p>
         <span className="footer-wink">ROLL CREDITS →</span>
       </footer>
 

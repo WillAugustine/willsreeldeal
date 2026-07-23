@@ -47,3 +47,16 @@ test("contains no em dashes in visitor or studio copy", async () => {
   ]);
   for (const file of files) assert.doesNotMatch(file, /—/);
 });
+
+test("uses real Letterboxd reviews without Netflix links", async () => {
+  const [home, affiliateRoute] = await Promise.all([
+    source("app/page.tsx"),
+    source("app/go/[provider]/route.ts"),
+  ]);
+
+  assert.match(home, /letterboxd\.com\/foodiefrank/);
+  assert.match(home, /title: "I Swear"/);
+  assert.match(home, /title: "The Batman"/);
+  assert.doesNotMatch(home, /netflix/i);
+  assert.doesNotMatch(affiliateRoute, /netflix/i);
+});
