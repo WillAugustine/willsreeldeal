@@ -36,6 +36,19 @@ test("uses a typo-proof genre checklist for new reviews", async () => {
   assert.match(route, /parseReviewGenres/);
 });
 
+test("auto-populates runtime from the selected movie", async () => {
+  const [searchRoute, studio] = await Promise.all([
+    source("app/api/movies/search/route.ts"),
+    source("app/studio/StudioForm.tsx"),
+  ]);
+
+  assert.match(searchRoute, /wdt:P2047 \?duration/);
+  assert.match(searchRoute, /runtime: \(\(\) =>/);
+  assert.match(studio, /setRuntime\(movie\.runtime \? String\(movie\.runtime\) : ""\)/);
+  assert.match(studio, /Runtime <span>Auto-filled<\/span>/);
+  assert.match(studio, /form\.set\("runtime", runtime\)/);
+});
+
 test("configures persistent review records and poster storage", async () => {
   const [schema, route, config, auth] = await Promise.all([
     source("db/schema.ts"),

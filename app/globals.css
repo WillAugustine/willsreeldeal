@@ -241,6 +241,7 @@ footer > p { margin: 0; color: rgba(244,240,223,.53); font-size: 10px; line-heig
 .studio-form__heading strong { width: 44px; height: 44px; border-radius: 50%; background: var(--forest); color: var(--lime); display: grid; place-items: center; font: 800 15px Georgia, serif; }
 .studio-field { position: relative; margin-bottom: 26px; }
 .studio-field > label:first-child { display: block; margin-bottom: 9px; font-size: 9px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+.studio-field > label:first-child > span { float: right; color: #60776a; font-size: 8px; letter-spacing: .08em; }
 .studio-field > input:not(.poster-input), .studio-field textarea, .input-suffix { width: 100%; border: 1px solid rgba(16,40,28,.27); background: white; color: var(--ink); }
 .studio-field > input:not(.poster-input) { height: 55px; padding: 0 16px; }
 .studio-field textarea { display: block; resize: vertical; min-height: 165px; padding: 16px; font: 14px/1.6 Arial, sans-serif; }

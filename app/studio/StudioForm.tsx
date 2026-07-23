@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { formatReviewGenres, REVIEW_GENRES } from "../genres";
 
-type Movie = { id: string; title: string; year: string };
+type Movie = { id: string; title: string; year: string; runtime: number | null };
 
 export default function StudioForm() {
   const [query, setQuery] = useState("");
@@ -12,6 +12,7 @@ export default function StudioForm() {
   const [searching, setSearching] = useState(false);
   const [posterPreview, setPosterPreview] = useState("");
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  const [runtime, setRuntime] = useState("");
   const [message, setMessage] = useState("");
   const [publishing, setPublishing] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -56,6 +57,7 @@ export default function StudioForm() {
     form.set("title", selected.title);
     form.set("year", selected.year);
     form.set("genre", formatReviewGenres(selectedGenres));
+    form.set("runtime", runtime);
 
     try {
       const response = await fetch("/studio/api/reviews", { method: "POST", body: form });
@@ -67,6 +69,7 @@ export default function StudioForm() {
       setSelected(null);
       setResults([]);
       setSelectedGenres([]);
+      setRuntime("");
       previewPoster();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "The projector jammed. Try again.");
@@ -89,7 +92,10 @@ export default function StudioForm() {
           <input id="studio-movie" value={query} onChange={(event) => {
             const nextQuery = event.target.value;
             setQuery(nextQuery);
-            if (selected && nextQuery !== selected.title) setSelected(null);
+            if (selected && nextQuery !== selected.title) {
+              setSelected(null);
+              setRuntime("");
+            }
             if (nextQuery.trim().length < 2) setResults([]);
           }} placeholder="Search the movie universe" autoComplete="off" required />
           <i>{searching ? "Searching..." : selected ? "Selected" : "Pick from list"}</i>
@@ -97,15 +103,20 @@ export default function StudioForm() {
         {results.length > 0 && !selected && (
           <div className="studio-search-results">
             {results.map((movie) => (
-              <button key={movie.id} type="button" onClick={() => { setSelected(movie); setQuery(movie.title); setResults([]); }}>
+              <button key={movie.id} type="button" onClick={() => {
+                setSelected(movie);
+                setQuery(movie.title);
+                setRuntime(movie.runtime ? String(movie.runtime) : "");
+                setResults([]);
+              }}>
                 <span className="result-dot" />
                 <strong>{movie.title}</strong>
-                <small>{movie.year || "Year unknown"}</small>
+                <small>{movie.year || "Year unknown"}{movie.runtime ? ` · ${movie.runtime} min` : ""}</small>
               </button>
             ))}
           </div>
         )}
-        {selected && <p className="studio-selected">Locked in: <strong>{selected.title}</strong> ({selected.year}) <button type="button" onClick={() => { setSelected(null); setQuery(""); }}>Change</button></p>}
+        {selected && <p className="studio-selected">Locked in: <strong>{selected.title}</strong> ({selected.year}) <button type="button" onClick={() => { setSelected(null); setQuery(""); setRuntime(""); }}>Change</button></p>}
       </div>
 
       <fieldset className="studio-field studio-genre-field">
@@ -134,8 +145,8 @@ export default function StudioForm() {
 
       <div className="studio-form__row studio-form__row--numbers">
         <div className="studio-field studio-field--small">
-          <label htmlFor="runtime">Runtime</label>
-          <div className="input-suffix"><input id="runtime" name="runtime" type="number" min="1" max="600" placeholder="120" required /><span>MIN</span></div>
+          <label htmlFor="runtime">Runtime <span>Auto-filled</span></label>
+          <div className="input-suffix"><input id="runtime" name="runtime" type="number" min="1" max="600" value={runtime} onChange={(event) => setRuntime(event.target.value)} placeholder="Select a movie" required /><span>MIN</span></div>
         </div>
         <div className="studio-field studio-field--small">
           <label htmlFor="rating">Will-o-Meter</label>
@@ -163,7 +174,7 @@ export default function StudioForm() {
 
       <div className="studio-submit">
         <p aria-live="polite">{message || "Publishing makes the review visible on the homepage immediately."}</p>
-        <button className="button button--lime" type="submit" disabled={publishing || !selected || selectedGenres.length === 0}>{publishing ? "Publishing..." : "Publish the take"}<span>↗</span></button>
+        <button className="button button--lime" type="submit" disabled={publishing || !selected || selectedGenres.length === 0 || !runtime}>{publishing ? "Publishing..." : "Publish the take"}<span>↗</span></button>
       </div>
     </form>
   );
