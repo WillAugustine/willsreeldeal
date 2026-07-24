@@ -4,7 +4,6 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { REVIEW_GENRES } from "./genres";
 import { fallbackReviews } from "./review-catalog";
-import { getWatchListing } from "./watch-catalog";
 
 type Movie = {
   id: string;
@@ -65,13 +64,11 @@ function Poster({ movie, compact = false }: { movie: Movie; compact?: boolean })
 }
 
 function WatchLinks({ movie, compact = false }: { movie: Movie; compact?: boolean }) {
-  const listing = getWatchListing(movie.title, movie.year);
-  if (!listing) return null;
   const query = `?title=${encodeURIComponent(movie.title)}&year=${encodeURIComponent(movie.year)}`;
   return (
     <div className={`watch-links ${compact ? "watch-links--compact" : ""}`} aria-label={`Where to watch ${movie.title}`}>
-      {(listing.amazonId || listing.amazonQuery) && <a href={`/go/amazon${query}`} target="_blank" rel="sponsored noopener">Amazon <span>↗</span></a>}
-      {listing.appleUrl && <a href={`/go/apple${query}`} target="_blank" rel="noopener">Apple TV <span>↗</span></a>}
+      <a href={`/go/amazon${query}`} target="_blank" rel="sponsored noopener">Amazon <span>↗</span></a>
+      <a href={`/go/apple${query}`} target="_blank" rel="noopener">Apple TV <span>↗</span></a>
     </div>
   );
 }

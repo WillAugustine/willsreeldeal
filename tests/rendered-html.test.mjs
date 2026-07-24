@@ -216,16 +216,22 @@ test("shows decimal ratings, the 1-10 scale, and the latest-watch label", async 
   assert.match(home, /What every number actually means/);
 });
 
-test("uses verified movie destinations and the Amazon Associates tag", async () => {
+test("generates watch destinations for every review and preserves verified links", async () => {
   const [home, affiliateRoute, catalog] = await Promise.all([
     source("app/page.tsx"),
     source("app/go/[provider]/route.ts"),
     source("app/watch-catalog.ts"),
   ]);
 
-  assert.match(home, /getWatchListing\(movie\.title, movie\.year\)/);
+  assert.doesNotMatch(home, /getWatchListing\(movie\.title, movie\.year\)/);
+  assert.match(home, /href=\{`\/go\/amazon\$\{query\}`\}/);
+  assert.match(home, /href=\{`\/go\/apple\$\{query\}`\}/);
   assert.match(affiliateRoute, /willsreeldeal-20/);
   assert.match(affiliateRoute, /gp\/video\/detail/);
+  assert.match(affiliateRoute, /`\$\{title\} \$\{year\} movie`/);
+  assert.match(affiliateRoute, /iTunes\.apple\.com\/search/i);
+  assert.match(affiliateRoute, /trackViewUrl/);
+  assert.match(affiliateRoute, /isAvailableToRentOrBuy/);
   assert.match(catalog, /0UAG2NRWRJA02MMHU02N5RX8WR/);
   assert.match(catalog, /tv\.apple\.com\/us\/movie\/i-swear/);
   assert.doesNotMatch(catalog, /movieKey\("Palm Springs", "2020"\)/);
