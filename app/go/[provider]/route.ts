@@ -50,12 +50,11 @@ export async function GET(request: Request, context: { params: Promise<{ provide
   const affiliate = env as unknown as AffiliateEnv;
   const savedReview = review.startsWith("review-");
   const savedLinks = savedReview ? await getSavedWatchLinks(affiliate.DB, review) : null;
-  const listing = savedReview ? undefined : getWatchListing(title, year);
+  const listing = getWatchListing(title, year);
 
   if (provider === "amazon") {
     let amazon: URL;
-    if (savedReview) {
-      if (!savedLinks?.amazon_url) return Response.redirect(new URL("/", request.url), 302);
+    if (savedLinks?.amazon_url) {
       const savedAmazon = parseProviderUrl(savedLinks.amazon_url, "amazon");
       if (!savedAmazon) return Response.redirect(new URL("/", request.url), 302);
       amazon = savedAmazon;
@@ -73,7 +72,7 @@ export async function GET(request: Request, context: { params: Promise<{ provide
   }
 
   if (provider === "apple") {
-    const appleUrl = savedReview ? savedLinks?.apple_url : listing?.appleUrl;
+    const appleUrl = savedLinks?.apple_url || listing?.appleUrl;
     if (!appleUrl) return Response.redirect(new URL("/", request.url), 302);
     const apple = parseProviderUrl(appleUrl, "apple");
     if (!apple) return Response.redirect(new URL("/", request.url), 302);

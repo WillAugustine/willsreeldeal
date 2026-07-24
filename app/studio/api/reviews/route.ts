@@ -110,6 +110,12 @@ async function database() {
 }
 
 function serialize(row: ReviewRow) {
+  const listing = getWatchListing(row.title, row.release_year);
+  const catalogAmazonUrl = listing?.amazonId
+    ? `https://www.amazon.com/gp/video/detail/${listing.amazonId}/ref=nosim`
+    : listing?.amazonQuery
+      ? `https://www.amazon.com/s?k=${encodeURIComponent(listing.amazonQuery)}&i=instant-video`
+      : "";
   return {
     id: `review-${row.id}`,
     slug: row.slug,
@@ -126,8 +132,8 @@ function serialize(row: ReviewRow) {
     rewatchOdds: row.rewatch_odds,
     watchParty: row.watch_party,
     sleepRisk: row.sleep_risk,
-    amazonUrl: row.amazon_url,
-    appleUrl: row.apple_url,
+    amazonUrl: row.amazon_url || catalogAmazonUrl,
+    appleUrl: row.apple_url || listing?.appleUrl || "",
     poster: row.poster_content_type === "external/url"
       ? row.poster_key
       : `/api/posters/${encodeURIComponent(row.poster_key)}`,

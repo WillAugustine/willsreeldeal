@@ -227,15 +227,17 @@ test("shows only verified rent or buy links and tags Amazon automatically", asyn
     source("db/schema.ts"),
   ]);
 
-  assert.match(home, /savedReview\s*\?\s*Boolean\(movie\.amazonUrl\)/);
-  assert.match(home, /savedReview \? Boolean\(movie\.appleUrl\)/);
+  assert.match(home, /Boolean\(movie\.amazonUrl \|\| listing\?\.amazonId \|\| listing\?\.amazonQuery\)/);
+  assert.match(home, /Boolean\(movie\.appleUrl \|\| listing\?\.appleUrl\)/);
   assert.match(home, /if \(!hasAmazon && !hasApple\) return null/);
   assert.match(home, /\{hasAmazon && <a href=\{`\/go\/amazon\$\{query\}`\}/);
   assert.match(home, /\{hasApple && <a href=\{`\/go\/apple\$\{query\}`\}/);
   assert.match(affiliateRoute, /willsreeldeal-20/);
   assert.match(affiliateRoute, /gp\/video\/detail/);
   assert.match(affiliateRoute, /SELECT amazon_url, apple_url FROM reviews WHERE id = \?/);
-  assert.match(affiliateRoute, /if \(!savedLinks\?\.amazon_url\)/);
+  assert.match(affiliateRoute, /if \(savedLinks\?\.amazon_url\)/);
+  assert.match(affiliateRoute, /const listing = getWatchListing\(title, year\)/);
+  assert.match(affiliateRoute, /savedLinks\?\.apple_url \|\| listing\?\.appleUrl/);
   assert.match(affiliateRoute, /if \(!appleUrl\)/);
   assert.doesNotMatch(affiliateRoute, /itunes\.apple\.com\/search/i);
   assert.doesNotMatch(affiliateRoute, /tv\.apple\.com\/us\/search/);

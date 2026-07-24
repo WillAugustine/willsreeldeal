@@ -67,12 +67,9 @@ function Poster({ movie, compact = false }: { movie: Movie; compact?: boolean })
 }
 
 function WatchLinks({ movie, compact = false }: { movie: Movie; compact?: boolean }) {
-  const savedReview = movie.id.startsWith("review-");
-  const listing = savedReview ? undefined : getWatchListing(movie.title, movie.year);
-  const hasAmazon = savedReview
-    ? Boolean(movie.amazonUrl)
-    : Boolean(listing?.amazonId || listing?.amazonQuery);
-  const hasApple = savedReview ? Boolean(movie.appleUrl) : Boolean(listing?.appleUrl);
+  const listing = getWatchListing(movie.title, movie.year);
+  const hasAmazon = Boolean(movie.amazonUrl || listing?.amazonId || listing?.amazonQuery);
+  const hasApple = Boolean(movie.appleUrl || listing?.appleUrl);
   if (!hasAmazon && !hasApple) return null;
 
   const query = `?title=${encodeURIComponent(movie.title)}&year=${encodeURIComponent(movie.year)}&review=${encodeURIComponent(movie.id)}`;
