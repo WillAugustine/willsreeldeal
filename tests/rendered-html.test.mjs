@@ -233,6 +233,7 @@ test("generates watch destinations for every review and preserves verified links
   assert.match(affiliateRoute, /term: title/);
   assert.match(affiliateRoute, /trackViewUrl/);
   assert.match(affiliateRoute, /isAvailableToRentOrBuy/);
+  assert.match(affiliateRoute, /tv\.apple\.com\/us\/search/);
   assert.match(catalog, /0UAG2NRWRJA02MMHU02N5RX8WR/);
   assert.match(catalog, /tv\.apple\.com\/us\/movie\/i-swear/);
   assert.doesNotMatch(catalog, /movieKey\("Palm Springs", "2020"\)/);

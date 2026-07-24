@@ -79,9 +79,10 @@ export async function GET(request: Request, context: { params: Promise<{ provide
 
   if (provider === "apple") {
     const appleUrl = listing?.appleUrl || await findAppleMovie(title, year);
-    if (!appleUrl) return Response.redirect(new URL("/", request.url), 302);
-
-    const apple = new URL(appleUrl);
+    const apple = appleUrl
+      ? new URL(appleUrl)
+      : new URL("https://tv.apple.com/us/search");
+    if (!appleUrl) apple.searchParams.set("term", title);
     if (affiliate.APPLE_AFFILIATE_TOKEN) {
       apple.searchParams.set("at", affiliate.APPLE_AFFILIATE_TOKEN);
       apple.searchParams.set("ct", "wills-reel-deal");
