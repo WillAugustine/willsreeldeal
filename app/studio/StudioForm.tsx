@@ -26,6 +26,8 @@ type PublishedReview = {
   rewatchOdds: string;
   watchParty: string;
   sleepRisk: string;
+  amazonUrl: string;
+  appleUrl: string;
   poster: string;
   publishedAt: string;
 };
@@ -46,6 +48,8 @@ export default function StudioForm() {
   const [rewatchOdds, setRewatchOdds] = useState("");
   const [watchParties, setWatchParties] = useState<string[]>([]);
   const [sleepRisk, setSleepRisk] = useState("");
+  const [amazonUrl, setAmazonUrl] = useState("");
+  const [appleUrl, setAppleUrl] = useState("");
   const [message, setMessage] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [reviews, setReviews] = useState<PublishedReview[]>([]);
@@ -118,6 +122,8 @@ export default function StudioForm() {
     setRewatchOdds("");
     setWatchParties([]);
     setSleepRisk("");
+    setAmazonUrl("");
+    setAppleUrl("");
     setMessage(nextMessage);
   }
 
@@ -139,6 +145,8 @@ export default function StudioForm() {
     setRewatchOdds(review.rewatchOdds ?? "");
     setWatchParties(parseWatchParties(review.watchParty ?? ""));
     setSleepRisk(review.sleepRisk ?? "");
+    setAmazonUrl(review.amazonUrl ?? "");
+    setAppleUrl(review.appleUrl ?? "");
     setPosterPreview(review.poster);
     setMessage(`Editing ${review.title}. The current poster stays unless you choose a new one.`);
     window.setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
@@ -386,6 +394,37 @@ export default function StudioForm() {
               ))}
             </div>
           </fieldset>
+        </div>
+
+        <div className="studio-experience-panel">
+          <div className="studio-experience-panel__heading">
+            <span>Rent or buy links</span>
+            <p>Optional. Paste an exact movie page only after confirming the movie is available to rent or buy. A blank field keeps that button hidden.</p>
+          </div>
+
+          <div className="studio-field">
+            <label htmlFor="amazonUrl">Amazon movie URL <span>Affiliate tag added automatically</span></label>
+            <input
+              id="amazonUrl"
+              name="amazonUrl"
+              type="url"
+              value={amazonUrl}
+              onChange={(event) => setAmazonUrl(event.target.value)}
+              placeholder="https://www.amazon.com/gp/video/detail/..."
+            />
+          </div>
+
+          <div className="studio-field">
+            <label htmlFor="appleUrl">Apple TV movie URL <span>Optional</span></label>
+            <input
+              id="appleUrl"
+              name="appleUrl"
+              type="url"
+              value={appleUrl}
+              onChange={(event) => setAppleUrl(event.target.value)}
+              placeholder="https://tv.apple.com/us/movie/..."
+            />
+          </div>
         </div>
 
         <div className="studio-field">

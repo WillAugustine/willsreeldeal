@@ -3,6 +3,7 @@ import { getStudioOwner } from "../../../studio-auth";
 import { sendInstantReview } from "../../../newsletter-service";
 import { formatReviewGenres, parseReviewGenres } from "../../../genres";
 import { fallbackReviews } from "../../../review-catalog";
+import { getWatchListing } from "../../../watch-catalog";
 import {
   canonicalChoice,
   formatWatchParties,
@@ -36,6 +37,8 @@ type ReviewRow = {
   rewatch_odds: string;
   watch_party: string;
   sleep_risk: string;
+  amazon_url: string;
+  apple_url: string;
   poster_key: string;
   poster_content_type: string;
   published_at: string;
@@ -55,11 +58,13 @@ type ReviewFields = {
   rewatchOdds: string;
   watchParty: string;
   sleepRisk: string;
+  amazonUrl: string;
+  appleUrl: string;
 };
 
 const reviewColumns = `id, slug, movie_id, title, release_year, genre, runtime, content_rating,
   rating_tenths, blurb, review_text, favorite_quote, rewatch_odds, watch_party, sleep_risk,
-  poster_key, poster_content_type, published_at`;
+  amazon_url, apple_url, poster_key, poster_content_type, published_at`;
 const allowedPosterTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 async function database() {
@@ -81,6 +86,8 @@ async function database() {
     rewatch_odds TEXT NOT NULL DEFAULT '',
     watch_party TEXT NOT NULL DEFAULT '',
     sleep_risk TEXT NOT NULL DEFAULT '',
+    amazon_url TEXT NOT NULL DEFAULT '',
+    apple_url TEXT NOT NULL DEFAULT '',
     poster_key TEXT NOT NULL,
     poster_content_type TEXT NOT NULL,
     created_by TEXT NOT NULL,
@@ -93,6 +100,8 @@ async function database() {
     ["watch_party", `ALTER TABLE reviews ADD COLUMN watch_party TEXT NOT NULL DEFAULT ''`],
     ["sleep_risk", `ALTER TABLE reviews ADD COLUMN sleep_risk TEXT NOT NULL DEFAULT ''`],
     ["content_rating", `ALTER TABLE reviews ADD COLUMN content_rating TEXT NOT NULL DEFAULT ''`],
+    ["amazon_url", `ALTER TABLE reviews ADD COLUMN amazon_url TEXT NOT NULL DEFAULT ''`],
+    ["apple_url", `ALTER TABLE reviews ADD COLUMN apple_url TEXT NOT NULL DEFAULT ''`],
   ] as const;
   for (const [name, statement] of missingColumns) {
     if (!columns.results.some((column) => column.name === name)) await db.prepare(statement).run();
@@ -117,6 +126,8 @@ function serialize(row: ReviewRow) {
     rewatchOdds: row.rewatch_odds,
     watchParty: row.watch_party,
     sleepRisk: row.sleep_risk,
+    amazonUrl: row.amazon_url,
+    appleUrl: row.apple_url,
     poster: row.poster_content_type === "external/url"
       ? row.poster_key
       : `/api/posters/${encodeURIComponent(row.poster_key)}`,
@@ -125,6 +136,12 @@ function serialize(row: ReviewRow) {
 }
 
 function serializeCatalogReview(review: typeof fallbackReviews[number]) {
+  const listing = getWatchListing(review.title, review.year);
+  const amazonUrl = listing?.amazonId
+    ? `https://www.amazon.com/gp/video/detail/${listing.amazonId}/ref=nosim`
+    : listing?.amazonQuery
+      ? `https://www.amazon.com/s?k=${encodeURIComponent(listing.amazonQuery)}&i=instant-video`
+      : "";
   return {
     id: review.id,
     movieId: review.id,
@@ -140,6 +157,8 @@ function serializeCatalogReview(review: typeof fallbackReviews[number]) {
     rewatchOdds: review.rewatchOdds ?? "",
     watchParty: review.watchParty ?? "",
     sleepRisk: review.sleepRisk ?? "",
+    amazonUrl,
+    appleUrl: listing?.appleUrl ?? "",
     poster: review.poster,
     publishedAt: "",
   };
@@ -169,7 +188,21 @@ function reviewFields(form: FormData): ReviewFields {
     rewatchOdds: canonicalChoice(textField(form, "rewatchOdds"), REWATCH_ODDS),
     watchParty: formatWatchParties(parseWatchParties(textField(form, "watchParty"))),
     sleepRisk: canonicalChoice(textField(form, "sleepRisk"), SLEEP_RISKS),
+    amazonUrl: textField(form, "amazonUrl"),
+    appleUrl: textField(form, "appleUrl"),
   };
+}
+
+function isProviderUrl(value: string, provider: "amazon" | "apple") {
+  if (!value) return true;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:") return false;
+    if (provider === "amazon") return url.hostname === "amazon.com" || url.hostname.endsWith(".amazon.com");
+    return url.hostname === "tv.apple.com" || url.hostname === "itunes.apple.com";
+  } catch {
+    return false;
+  }
 }
 
 function reviewError(fields: ReviewFields, minimumReviewLength = 40) {
@@ -186,6 +219,8 @@ function reviewError(fields: ReviewFields, minimumReviewLength = 40) {
       : "Add a quick take and a full review.";
   }
   if (fields.favoriteQuote.length > 300) return "Keep the favorite quote under 300 characters.";
+  if (!isProviderUrl(fields.amazonUrl, "amazon")) return "Use a full amazon.com movie URL or leave it blank.";
+  if (!isProviderUrl(fields.appleUrl, "apple")) return "Use a full Apple TV movie URL or leave it blank.";
   return "";
 }
 
@@ -249,8 +284,9 @@ export async function POST(request: Request) {
 
     const result = await db.prepare(`INSERT INTO reviews
       (slug, movie_id, title, release_year, genre, runtime, content_rating, rating_tenths, blurb, review_text,
-      favorite_quote, rewatch_odds, watch_party, sleep_risk, poster_key, poster_content_type, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      favorite_quote, rewatch_odds, watch_party, sleep_risk, amazon_url, apple_url,
+      poster_key, poster_content_type, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .bind(
         slug,
         fields.movieId,
@@ -266,6 +302,8 @@ export async function POST(request: Request) {
         fields.rewatchOdds,
         fields.watchParty,
         fields.sleepRisk,
+        fields.amazonUrl,
+        fields.appleUrl,
         posterKey,
         poster.type,
         owner.email,
@@ -321,8 +359,9 @@ export async function PUT(request: Request) {
       const slug = `${slugify(fields.title)}-${fields.releaseYear || "film"}-${Date.now().toString(36)}`;
       const result = await db.prepare(`INSERT INTO reviews
         (slug, movie_id, title, release_year, genre, runtime, content_rating, rating_tenths, blurb, review_text,
-        favorite_quote, rewatch_odds, watch_party, sleep_risk, poster_key, poster_content_type, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        favorite_quote, rewatch_odds, watch_party, sleep_risk, amazon_url, apple_url,
+        poster_key, poster_content_type, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .bind(
           slug,
           fields.movieId,
@@ -338,6 +377,8 @@ export async function PUT(request: Request) {
           fields.rewatchOdds,
           fields.watchParty,
           fields.sleepRisk,
+          fields.amazonUrl,
+          fields.appleUrl,
           posterKey,
           posterContentType,
           owner.email,
@@ -361,7 +402,7 @@ export async function PUT(request: Request) {
     await db.prepare(`UPDATE reviews SET
       movie_id = ?, title = ?, release_year = ?, genre = ?, runtime = ?, content_rating = ?, rating_tenths = ?,
       blurb = ?, review_text = ?, favorite_quote = ?, rewatch_odds = ?, watch_party = ?,
-      sleep_risk = ?, poster_key = ?, poster_content_type = ?
+      sleep_risk = ?, amazon_url = ?, apple_url = ?, poster_key = ?, poster_content_type = ?
       WHERE id = ?`)
       .bind(
         fields.movieId,
@@ -377,6 +418,8 @@ export async function PUT(request: Request) {
         fields.rewatchOdds,
         fields.watchParty,
         fields.sleepRisk,
+        fields.amazonUrl,
+        fields.appleUrl,
         posterKey,
         posterContentType,
         reviewId,

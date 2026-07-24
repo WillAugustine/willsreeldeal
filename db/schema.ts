@@ -61,6 +61,8 @@ export const reviews = sqliteTable("reviews", {
   rewatchOdds: text("rewatch_odds").notNull().default(""),
   watchParty: text("watch_party").notNull().default(""),
   sleepRisk: text("sleep_risk").notNull().default(""),
+  amazonUrl: text("amazon_url").notNull().default(""),
+  appleUrl: text("apple_url").notNull().default(""),
   posterKey: text("poster_key").notNull(),
   posterContentType: text("poster_content_type").notNull(),
   createdBy: text("created_by").notNull(),

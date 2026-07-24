@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { REVIEW_GENRES } from "./genres";
 import { fallbackReviews } from "./review-catalog";
+import { getWatchListing } from "./watch-catalog";
 
 type Movie = {
   id: string;
@@ -22,6 +23,8 @@ type Movie = {
   rewatchOdds?: string;
   watchParty?: string;
   sleepRisk?: string;
+  amazonUrl?: string;
+  appleUrl?: string;
   poster?: string;
   letterboxdUrl?: string;
 };
@@ -64,11 +67,19 @@ function Poster({ movie, compact = false }: { movie: Movie; compact?: boolean })
 }
 
 function WatchLinks({ movie, compact = false }: { movie: Movie; compact?: boolean }) {
-  const query = `?title=${encodeURIComponent(movie.title)}&year=${encodeURIComponent(movie.year)}`;
+  const savedReview = movie.id.startsWith("review-");
+  const listing = savedReview ? undefined : getWatchListing(movie.title, movie.year);
+  const hasAmazon = savedReview
+    ? Boolean(movie.amazonUrl)
+    : Boolean(listing?.amazonId || listing?.amazonQuery);
+  const hasApple = savedReview ? Boolean(movie.appleUrl) : Boolean(listing?.appleUrl);
+  if (!hasAmazon && !hasApple) return null;
+
+  const query = `?title=${encodeURIComponent(movie.title)}&year=${encodeURIComponent(movie.year)}&review=${encodeURIComponent(movie.id)}`;
   return (
     <div className={`watch-links ${compact ? "watch-links--compact" : ""}`} aria-label={`Where to watch ${movie.title}`}>
-      <a href={`/go/amazon${query}`} target="_blank" rel="sponsored noopener">Amazon <span>↗</span></a>
-      <a href={`/go/apple${query}`} target="_blank" rel="noopener">Apple TV <span>↗</span></a>
+      {hasAmazon && <a href={`/go/amazon${query}`} target="_blank" rel="sponsored noopener">Amazon <span>↗</span></a>}
+      {hasApple && <a href={`/go/apple${query}`} target="_blank" rel="noopener">Apple TV <span>↗</span></a>}
     </div>
   );
 }

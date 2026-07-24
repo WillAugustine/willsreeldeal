@@ -18,6 +18,8 @@ type ReviewRow = {
   rewatch_odds: string;
   watch_party: string;
   sleep_risk: string;
+  amazon_url: string;
+  apple_url: string;
   poster_key: string;
   poster_content_type: string;
   published_at: string;
@@ -42,6 +44,8 @@ async function database() {
     rewatch_odds TEXT NOT NULL DEFAULT '',
     watch_party TEXT NOT NULL DEFAULT '',
     sleep_risk TEXT NOT NULL DEFAULT '',
+    amazon_url TEXT NOT NULL DEFAULT '',
+    apple_url TEXT NOT NULL DEFAULT '',
     poster_key TEXT NOT NULL,
     poster_content_type TEXT NOT NULL,
     created_by TEXT NOT NULL,
@@ -54,6 +58,8 @@ async function database() {
     ["watch_party", `ALTER TABLE reviews ADD COLUMN watch_party TEXT NOT NULL DEFAULT ''`],
     ["sleep_risk", `ALTER TABLE reviews ADD COLUMN sleep_risk TEXT NOT NULL DEFAULT ''`],
     ["content_rating", `ALTER TABLE reviews ADD COLUMN content_rating TEXT NOT NULL DEFAULT ''`],
+    ["amazon_url", `ALTER TABLE reviews ADD COLUMN amazon_url TEXT NOT NULL DEFAULT ''`],
+    ["apple_url", `ALTER TABLE reviews ADD COLUMN apple_url TEXT NOT NULL DEFAULT ''`],
   ] as const;
   for (const [name, statement] of missingColumns) {
     if (!columns.results.some((column) => column.name === name)) await db.prepare(statement).run();
@@ -78,6 +84,8 @@ function serialize(row: ReviewRow) {
     rewatchOdds: row.rewatch_odds,
     watchParty: row.watch_party,
     sleepRisk: row.sleep_risk,
+    amazonUrl: row.amazon_url,
+    appleUrl: row.apple_url,
     poster: row.poster_content_type === "external/url"
       ? row.poster_key
       : `/api/posters/${encodeURIComponent(row.poster_key)}`,
@@ -91,7 +99,7 @@ export async function GET() {
     if (!db) return Response.json({ reviews: [] });
     const result = await db.prepare(`SELECT id, slug, movie_id, title, release_year, genre, runtime, content_rating,
       rating_tenths, blurb, review_text, favorite_quote, rewatch_odds, watch_party, sleep_risk,
-      poster_key, poster_content_type, published_at
+      amazon_url, apple_url, poster_key, poster_content_type, published_at
       FROM reviews ORDER BY published_at DESC, id DESC LIMIT 24`).all<ReviewRow>();
     return Response.json({ reviews: result.results.map(serialize) });
   } catch {

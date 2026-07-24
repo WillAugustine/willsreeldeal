@@ -2,57 +2,40 @@ import { env } from "cloudflare:workers";
 import { getWatchListing } from "../../watch-catalog";
 
 type AffiliateEnv = {
+  DB?: D1Database;
   AMAZON_ASSOCIATE_TAG?: string;
   APPLE_AFFILIATE_TOKEN?: string;
 };
 
-type AppleMovie = {
-  trackName?: string;
-  releaseDate?: string;
-  trackViewUrl?: string;
-  trackPrice?: number;
-  trackRentalPrice?: number;
+type SavedWatchLinks = {
+  amazon_url: string;
+  apple_url: string;
 };
 
-function cleanTitle(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/&/g, "and")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
-function isAvailableToRentOrBuy(movie: AppleMovie) {
-  return [movie.trackPrice, movie.trackRentalPrice]
-    .some((price) => typeof price === "number" && Number.isFinite(price) && price >= 0);
-}
-
-async function findAppleMovie(title: string, year: string) {
-  const params = new URLSearchParams({
-    term: title,
-    country: "US",
-    media: "movie",
-    entity: "movie",
-    limit: "25",
-  });
-
+async function getSavedWatchLinks(db: D1Database | undefined, review: string) {
+  const match = review.match(/^review-(\d+)$/);
+  if (!db || !match) return null;
   try {
-    const response = await fetch(`https://itunes.apple.com/search?${params}`, {
-      headers: { Accept: "application/json", "User-Agent": "WillsReelDeal/1.0" },
-      signal: AbortSignal.timeout(3500),
-    });
-    if (!response.ok) return "";
-
-    const data = await response.json() as { results?: AppleMovie[] };
-    const matchingTitle = (data.results ?? []).filter((movie) =>
-      movie.trackViewUrl &&
-      cleanTitle(movie.trackName ?? "") === cleanTitle(title) &&
-      isAvailableToRentOrBuy(movie)
-    );
-    const matchingYear = matchingTitle.find((movie) => movie.releaseDate?.slice(0, 4) === year);
-    return matchingYear?.trackViewUrl ?? matchingTitle[0]?.trackViewUrl ?? "";
+    return await db.prepare("SELECT amazon_url, apple_url FROM reviews WHERE id = ?")
+      .bind(Number(match[1]))
+      .first<SavedWatchLinks>();
   } catch {
-    return "";
+    return null;
+  }
+}
+
+function isAllowedProviderUrl(url: URL, provider: "amazon" | "apple") {
+  if (url.protocol !== "https:") return false;
+  if (provider === "amazon") return url.hostname === "amazon.com" || url.hostname.endsWith(".amazon.com");
+  return url.hostname === "tv.apple.com" || url.hostname === "itunes.apple.com";
+}
+
+function parseProviderUrl(value: string, provider: "amazon" | "apple") {
+  try {
+    const url = new URL(value);
+    return isAllowedProviderUrl(url, provider) ? url : null;
+  } catch {
+    return null;
   }
 }
 
@@ -61,28 +44,39 @@ export async function GET(request: Request, context: { params: Promise<{ provide
   const requestUrl = new URL(request.url);
   const title = requestUrl.searchParams.get("title")?.trim().slice(0, 120) || "";
   const year = requestUrl.searchParams.get("year")?.trim().slice(0, 4) || "";
+  const review = requestUrl.searchParams.get("review")?.trim() || "";
   if (!title) return Response.redirect(new URL("/", request.url), 302);
 
-  const listing = getWatchListing(title, year);
   const affiliate = env as unknown as AffiliateEnv;
+  const savedReview = review.startsWith("review-");
+  const savedLinks = savedReview ? await getSavedWatchLinks(affiliate.DB, review) : null;
+  const listing = savedReview ? undefined : getWatchListing(title, year);
+
   if (provider === "amazon") {
-    const amazon = listing?.amazonId
-      ? new URL(`https://www.amazon.com/gp/video/detail/${listing.amazonId}/ref=nosim`)
-      : new URL("https://www.amazon.com/s");
-    if (!listing?.amazonId) {
-      amazon.searchParams.set("k", listing?.amazonQuery || `${title} ${year} movie`.trim());
+    let amazon: URL;
+    if (savedReview) {
+      if (!savedLinks?.amazon_url) return Response.redirect(new URL("/", request.url), 302);
+      const savedAmazon = parseProviderUrl(savedLinks.amazon_url, "amazon");
+      if (!savedAmazon) return Response.redirect(new URL("/", request.url), 302);
+      amazon = savedAmazon;
+    } else if (listing?.amazonId) {
+      amazon = new URL(`https://www.amazon.com/gp/video/detail/${listing.amazonId}/ref=nosim`);
+    } else if (listing?.amazonQuery) {
+      amazon = new URL("https://www.amazon.com/s");
+      amazon.searchParams.set("k", listing.amazonQuery);
       amazon.searchParams.set("i", "instant-video");
+    } else {
+      return Response.redirect(new URL("/", request.url), 302);
     }
     amazon.searchParams.set("tag", affiliate.AMAZON_ASSOCIATE_TAG || "willsreeldeal-20");
     return Response.redirect(amazon, 302);
   }
 
   if (provider === "apple") {
-    const appleUrl = listing?.appleUrl || await findAppleMovie(title, year);
-    const apple = appleUrl
-      ? new URL(appleUrl)
-      : new URL("https://tv.apple.com/us/search");
-    if (!appleUrl) apple.searchParams.set("term", title);
+    const appleUrl = savedReview ? savedLinks?.apple_url : listing?.appleUrl;
+    if (!appleUrl) return Response.redirect(new URL("/", request.url), 302);
+    const apple = parseProviderUrl(appleUrl, "apple");
+    if (!apple) return Response.redirect(new URL("/", request.url), 302);
     if (affiliate.APPLE_AFFILIATE_TOKEN) {
       apple.searchParams.set("at", affiliate.APPLE_AFFILIATE_TOKEN);
       apple.searchParams.set("ct", "wills-reel-deal");

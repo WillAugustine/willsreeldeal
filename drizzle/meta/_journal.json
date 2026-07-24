@@ -43,6 +43,13 @@
       "when": 1784838218575,
       "tag": "0005_melodic_lethal_legion",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1784900884107,
+      "tag": "0006_lethal_scarecrow",
+      "breakpoints": true
     }
   ]
 }

@@ -216,24 +216,36 @@ test("shows decimal ratings, the 1-10 scale, and the latest-watch label", async 
   assert.match(home, /What every number actually means/);
 });
 
-test("generates watch destinations for every review and preserves verified links", async () => {
-  const [home, affiliateRoute, catalog] = await Promise.all([
+test("shows only verified rent or buy links and tags Amazon automatically", async () => {
+  const [home, affiliateRoute, catalog, studio, studioRoute, publicRoute, schema] = await Promise.all([
     source("app/page.tsx"),
     source("app/go/[provider]/route.ts"),
     source("app/watch-catalog.ts"),
+    source("app/studio/StudioForm.tsx"),
+    source("app/studio/api/reviews/route.ts"),
+    source("app/api/reviews/route.ts"),
+    source("db/schema.ts"),
   ]);
 
-  assert.doesNotMatch(home, /getWatchListing\(movie\.title, movie\.year\)/);
-  assert.match(home, /href=\{`\/go\/amazon\$\{query\}`\}/);
-  assert.match(home, /href=\{`\/go\/apple\$\{query\}`\}/);
+  assert.match(home, /savedReview\s*\?\s*Boolean\(movie\.amazonUrl\)/);
+  assert.match(home, /savedReview \? Boolean\(movie\.appleUrl\)/);
+  assert.match(home, /if \(!hasAmazon && !hasApple\) return null/);
+  assert.match(home, /\{hasAmazon && <a href=\{`\/go\/amazon\$\{query\}`\}/);
+  assert.match(home, /\{hasApple && <a href=\{`\/go\/apple\$\{query\}`\}/);
   assert.match(affiliateRoute, /willsreeldeal-20/);
   assert.match(affiliateRoute, /gp\/video\/detail/);
-  assert.match(affiliateRoute, /`\$\{title\} \$\{year\} movie`/);
-  assert.match(affiliateRoute, /iTunes\.apple\.com\/search/i);
-  assert.match(affiliateRoute, /term: title/);
-  assert.match(affiliateRoute, /trackViewUrl/);
-  assert.match(affiliateRoute, /isAvailableToRentOrBuy/);
-  assert.match(affiliateRoute, /tv\.apple\.com\/us\/search/);
+  assert.match(affiliateRoute, /SELECT amazon_url, apple_url FROM reviews WHERE id = \?/);
+  assert.match(affiliateRoute, /if \(!savedLinks\?\.amazon_url\)/);
+  assert.match(affiliateRoute, /if \(!appleUrl\)/);
+  assert.doesNotMatch(affiliateRoute, /itunes\.apple\.com\/search/i);
+  assert.doesNotMatch(affiliateRoute, /tv\.apple\.com\/us\/search/);
+  assert.match(studio, /name="amazonUrl"/);
+  assert.match(studio, /name="appleUrl"/);
+  assert.match(studio, /A blank field keeps that button hidden/);
+  assert.match(studioRoute, /amazon_url, apple_url/);
+  assert.match(publicRoute, /amazonUrl: row\.amazon_url/);
+  assert.match(schema, /amazonUrl: text\("amazon_url"\)/);
+  assert.match(schema, /appleUrl: text\("apple_url"\)/);
   assert.match(catalog, /0UAG2NRWRJA02MMHU02N5RX8WR/);
   assert.match(catalog, /tv\.apple\.com\/us\/movie\/i-swear/);
   assert.doesNotMatch(catalog, /movieKey\("Palm Springs", "2020"\)/);
