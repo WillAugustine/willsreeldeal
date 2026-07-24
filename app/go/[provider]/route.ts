@@ -29,7 +29,7 @@ function isAvailableToRentOrBuy(movie: AppleMovie) {
 
 async function findAppleMovie(title: string, year: string) {
   const params = new URLSearchParams({
-    term: `${title} ${year}`.trim(),
+    term: title,
     country: "US",
     media: "movie",
     entity: "movie",
