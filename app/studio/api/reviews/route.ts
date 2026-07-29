@@ -180,6 +180,7 @@ function slugify(value: string) {
 
 function reviewFields(form: FormData): ReviewFields {
   const genres = parseReviewGenres(textField(form, "genre"));
+  const ratingValue = textField(form, "rating");
   return {
     movieId: textField(form, "movieId"),
     title: textField(form, "title"),
@@ -187,7 +188,7 @@ function reviewFields(form: FormData): ReviewFields {
     genre: formatReviewGenres(genres),
     runtime: Number(textField(form, "runtime")),
     contentRating: textField(form, "contentRating").toUpperCase().slice(0, 12),
-    rating: Number(textField(form, "rating")),
+    rating: ratingValue ? Number(ratingValue) : Number.NaN,
     blurb: textField(form, "blurb"),
     reviewText: textField(form, "reviewText"),
     favoriteQuote: textField(form, "favoriteQuote"),

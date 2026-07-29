@@ -25,6 +25,12 @@ type WikidataBinding = {
   contentRatingLabel?: { value: string };
 };
 
+type WikidataImdbBinding = {
+  imdbId: { value: string };
+  duration?: { value: string };
+  contentRatingLabel?: { value: string };
+};
+
 type AppleMovie = {
   trackId?: number;
   trackName?: string;
@@ -89,6 +95,57 @@ async function searchImdb(titleQuery: string): Promise<MovieResult[]> {
       runtime: null,
       poster: item.i?.imageUrl,
     }));
+}
+
+async function enrichImdbMovies(movies: MovieResult[]): Promise<MovieResult[]> {
+  const imdbIds = movies
+    .map((movie) => movie.id)
+    .filter((id) => /^tt\d+$/.test(id))
+    .slice(0, 20);
+  if (!imdbIds.length) return movies;
+
+  const values = imdbIds.map((id) => `"${id}"`).join(" ");
+  const sparql = `
+    SELECT DISTINCT ?imdbId ?duration ?contentRatingLabel WHERE {
+      VALUES ?imdbId { ${values} }
+      ?item wdt:P345 ?imdbId.
+      OPTIONAL { ?item wdt:P2047 ?duration. }
+      OPTIONAL { ?item wdt:P1657 ?contentRating. }
+      SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+    }`;
+
+  try {
+    const response = await fetch(`https://query.wikidata.org/sparql?query=${encodeURIComponent(sparql)}&format=json`, {
+      headers: { Accept: "application/sparql-results+json", "User-Agent": "WillsReelDeal/1.0" },
+      signal: AbortSignal.timeout(4500),
+    });
+    if (!response.ok) return movies;
+    const data = await response.json() as { results: { bindings: WikidataImdbBinding[] } };
+    const details = new Map<string, { runtime: number | null; contentRating?: string }>();
+
+    for (const row of data.results.bindings) {
+      const minutes = Math.round(Number(row.duration?.value));
+      const current = details.get(row.imdbId.value) ?? { runtime: null };
+      if (!current.runtime && Number.isInteger(minutes) && minutes >= 1 && minutes <= 600) {
+        current.runtime = minutes;
+      }
+      if (!current.contentRating && row.contentRatingLabel?.value) {
+        current.contentRating = row.contentRatingLabel.value;
+      }
+      details.set(row.imdbId.value, current);
+    }
+
+    return movies.map((movie) => {
+      const detail = details.get(movie.id);
+      return detail ? {
+        ...movie,
+        runtime: movie.runtime ?? detail.runtime,
+        contentRating: movie.contentRating ?? detail.contentRating,
+      } : movie;
+    });
+  } catch {
+    return movies;
+  }
 }
 
 async function searchApple(titleQuery: string): Promise<MovieResult[]> {
@@ -186,7 +243,7 @@ export async function GET(request: Request) {
 
   const { titleQuery, requestedYear } = parseSearch(rawQuery);
   const searches = await Promise.allSettled([
-    searchImdb(titleQuery),
+    searchImdb(titleQuery).then(enrichImdbMovies),
     searchWikidata(titleQuery),
     searchApple(titleQuery),
   ]);

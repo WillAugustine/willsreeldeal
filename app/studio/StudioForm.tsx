@@ -41,6 +41,8 @@ export default function StudioForm() {
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [runtime, setRuntime] = useState("");
   const [contentRating, setContentRating] = useState("");
+  const [movieDetailsMessage, setMovieDetailsMessage] = useState("");
+  const [loadingMovieDetails, setLoadingMovieDetails] = useState(false);
   const [rating, setRating] = useState("");
   const [blurb, setBlurb] = useState("");
   const [reviewText, setReviewText] = useState("");
@@ -57,6 +59,7 @@ export default function StudioForm() {
   const [editingId, setEditingId] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
   const posterObjectUrl = useRef("");
+  const movieDetailsController = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (selected && query === selected.title) return;
@@ -95,6 +98,7 @@ export default function StudioForm() {
       });
     return () => {
       active = false;
+      movieDetailsController.current?.abort();
       if (posterObjectUrl.current) URL.revokeObjectURL(posterObjectUrl.current);
     };
   }, []);
@@ -106,6 +110,7 @@ export default function StudioForm() {
   }
 
   function clearEditor(nextMessage = "") {
+    movieDetailsController.current?.abort();
     formRef.current?.reset();
     previewPoster();
     setEditingId("");
@@ -115,6 +120,8 @@ export default function StudioForm() {
     setSelectedGenres([]);
     setRuntime("");
     setContentRating("");
+    setMovieDetailsMessage("");
+    setLoadingMovieDetails(false);
     setRating("");
     setBlurb("");
     setReviewText("");
@@ -138,6 +145,8 @@ export default function StudioForm() {
     setSelectedGenres(parseReviewGenres(review.genre));
     setRuntime(String(review.runtime));
     setContentRating(review.contentRating ?? "");
+    setMovieDetailsMessage("Runtime and movie rating loaded from the published review.");
+    setLoadingMovieDetails(false);
     setRating(review.rating.toFixed(1));
     setBlurb(review.blurb);
     setReviewText(review.reviewText);
@@ -150,6 +159,58 @@ export default function StudioForm() {
     setPosterPreview(review.poster);
     setMessage(`Editing ${review.title}. The current poster stays unless you choose a new one.`);
     window.setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  }
+
+  async function chooseMovie(movie: Movie) {
+    movieDetailsController.current?.abort();
+    const controller = new AbortController();
+    movieDetailsController.current = controller;
+    setSelected(movie);
+    setQuery(movie.title);
+    setRuntime(movie.runtime ? String(movie.runtime) : "");
+    setContentRating(movie.contentRating ?? "");
+    setResults([]);
+
+    if (movie.runtime && movie.contentRating) {
+      setMovieDetailsMessage("Runtime and movie rating filled automatically.");
+      setLoadingMovieDetails(false);
+      return;
+    }
+
+    setLoadingMovieDetails(true);
+    setMovieDetailsMessage("Checking the movie databases for the missing details...");
+    try {
+      const exactQuery = `${movie.title}${movie.year ? ` (${movie.year})` : ""}`;
+      const response = await fetch(`/api/movies/search?q=${encodeURIComponent(exactQuery)}`, { signal: controller.signal });
+      const data = await response.json();
+      const exact = (data.movies as Movie[] | undefined)?.find((candidate) => (
+        candidate.id === movie.id ||
+        (candidate.title.toLowerCase() === movie.title.toLowerCase() && candidate.year === movie.year)
+      ));
+      if (controller.signal.aborted) return;
+      const resolvedRuntime = movie.runtime ?? exact?.runtime ?? null;
+      const resolvedRating = movie.contentRating ?? exact?.contentRating ?? "";
+      setSelected((current) => current?.id === movie.id ? {
+        ...current,
+        runtime: resolvedRuntime,
+        contentRating: resolvedRating,
+      } : current);
+      setRuntime(resolvedRuntime ? String(resolvedRuntime) : "");
+      setContentRating(resolvedRating);
+      setMovieDetailsMessage(
+        resolvedRuntime && resolvedRating
+          ? "Runtime and movie rating filled automatically."
+          : !resolvedRuntime
+            ? "Runtime is not listed yet. Enter it below so you can still publish this review."
+            : "Movie rating is not listed yet. You can enter it or leave it blank.",
+      );
+    } catch {
+      if (!controller.signal.aborted) {
+        setMovieDetailsMessage("Some movie details are not listed yet. Enter any missing runtime below and keep going.");
+      }
+    } finally {
+      if (!controller.signal.aborted) setLoadingMovieDetails(false);
+    }
   }
 
   async function publish(event: FormEvent<HTMLFormElement>) {
@@ -226,7 +287,7 @@ export default function StudioForm() {
         )}
       </section>
 
-      <form className={`studio-form ${editingId ? "studio-form--editing" : ""}`} onSubmit={publish} ref={formRef}>
+      <form className={`studio-form ${editingId ? "studio-form--editing" : ""}`} onSubmit={publish} ref={formRef} noValidate>
         <div className="studio-form__heading">
           <span>{editingId ? "Edit published review" : "New review"}</span>
           <strong>{editingId ? "EDIT" : "01"}</strong>
@@ -238,11 +299,14 @@ export default function StudioForm() {
             <span>⌕</span>
             <input id="studio-movie" value={query} onChange={(event) => {
               const nextQuery = event.target.value;
+              movieDetailsController.current?.abort();
               setQuery(nextQuery);
               if (selected && nextQuery !== selected.title) {
                 setSelected(null);
                 setRuntime("");
                 setContentRating("");
+                setMovieDetailsMessage("");
+                setLoadingMovieDetails(false);
               }
               if (nextQuery.trim().length < 2) setResults([]);
             }} placeholder="Search the movie universe" autoComplete="off" required />
@@ -251,13 +315,7 @@ export default function StudioForm() {
           {results.length > 0 && !selected && (
             <div className="studio-search-results">
               {results.map((movie) => (
-                <button key={movie.id} type="button" onClick={() => {
-                  setSelected(movie);
-                  setQuery(movie.title);
-                  setRuntime(movie.runtime ? String(movie.runtime) : "");
-                  setContentRating(movie.contentRating ?? "");
-                  setResults([]);
-                }}>
+                <button key={movie.id} type="button" onClick={() => void chooseMovie(movie)}>
                   <span className="result-dot" />
                   <strong>{movie.title}</strong>
                   <small>{movie.year || "Year unknown"}{movie.runtime ? ` · ${movie.runtime} min` : ""}{movie.contentRating ? ` · ${movie.contentRating}` : ""}</small>
@@ -265,7 +323,16 @@ export default function StudioForm() {
               ))}
             </div>
           )}
-          {selected && <p className="studio-selected">Locked in: <strong>{selected.title}</strong> ({selected.year}) <button type="button" onClick={() => { setSelected(null); setQuery(""); setRuntime(""); setContentRating(""); }}>Change</button></p>}
+          {selected && <p className="studio-selected">Locked in: <strong>{selected.title}</strong> ({selected.year}) <button type="button" onClick={() => {
+            movieDetailsController.current?.abort();
+            setSelected(null);
+            setQuery("");
+            setRuntime("");
+            setContentRating("");
+            setMovieDetailsMessage("");
+            setLoadingMovieDetails(false);
+          }}>Change</button></p>}
+          {selected && <p className="studio-movie-details" aria-live="polite">{loadingMovieDetails ? "Looking up runtime and movie rating..." : movieDetailsMessage}</p>}
         </div>
 
         <fieldset className="studio-field studio-genre-field">
@@ -294,11 +361,11 @@ export default function StudioForm() {
 
         <div className="studio-form__row studio-form__row--numbers">
           <div className="studio-field studio-field--small">
-            <label htmlFor="runtime">Runtime <span>Auto-filled</span></label>
+            <label htmlFor="runtime">Runtime <span>Auto-filled when listed</span></label>
             <div className="input-suffix"><input id="runtime" name="runtime" type="number" min="1" max="600" value={runtime} onChange={(event) => setRuntime(event.target.value)} placeholder="Select a movie" required /><span>MIN</span></div>
           </div>
           <div className="studio-field studio-field--small">
-            <label htmlFor="contentRating">Movie rating <span>Auto-filled</span></label>
+            <label htmlFor="contentRating">Movie rating <span>Auto-filled when listed</span></label>
             <input id="contentRating" name="contentRating" type="text" maxLength={12} value={contentRating} onChange={(event) => setContentRating(event.target.value.toUpperCase())} placeholder="PG-13" />
           </div>
           <div className="studio-field studio-field--small">
@@ -399,7 +466,7 @@ export default function StudioForm() {
         <div className="studio-experience-panel">
           <div className="studio-experience-panel__heading">
             <span>Rent or buy links</span>
-            <p>Optional. Paste an exact movie page only after confirming the movie is available to rent or buy. A blank field keeps that button hidden.</p>
+            <p>Optional. Theater-only movie? Leave both fields blank. A provider button appears only when you paste an exact rent or buy page.</p>
           </div>
 
           <div className="studio-field">

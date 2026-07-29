@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "wills-reel-deal",
   "account_id": "4e9622b2a59f8f4b2ed71ff21b280571",
-  "compatibility_date": "2026-07-21",
+  "compatibility_date": "2026-05-22",
   "compatibility_flags": ["nodejs_compat"],
   "main": "./worker/index.ts",
   "assets": {

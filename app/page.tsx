@@ -83,6 +83,7 @@ function WatchLinks({ movie, compact = false }: { movie: Movie; compact?: boolea
 
 export default function Home() {
   const [reviews, setReviews] = useState<Movie[]>(fallbackReviews);
+  const [reviewsLoaded, setReviewsLoaded] = useState(false);
   const [leaders, setLeaders] = useState<Leader[]>([]);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Movie[]>([]);
@@ -124,7 +125,8 @@ export default function Home() {
         ));
         setReviews([...newReviews, ...catalogReviews]);
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setReviewsLoaded(true));
   }, []);
 
   useEffect(() => {
@@ -241,15 +243,26 @@ export default function Home() {
             <p><strong>One human opinion.</strong><br />Taste buds may vary.</p>
           </div>
         </div>
-        <div className="hero__feature">
+        <div className={`hero__feature ${reviewsLoaded ? "" : "hero__feature--loading"}`}>
           <span className="feature__tag">Will’s latest watch</span>
-          <Poster movie={reviews[0]} />
-          <div className="feature__score">
-            <span>The Will-o-Meter™</span>
-            <strong>{formatRating(reviews[0].rating)}<small>/10</small></strong>
-          </div>
-          <p>“{reviews[0].blurb}”</p>
-          <WatchLinks movie={reviews[0]} />
+          {reviewsLoaded ? (
+            <>
+              <Poster movie={reviews[0]} />
+              <div className="feature__score">
+                <span>The Will-o-Meter™</span>
+                <strong>{formatRating(reviews[0].rating)}<small>/10</small></strong>
+              </div>
+              <p>“{reviews[0].blurb}”</p>
+              <WatchLinks movie={reviews[0]} />
+            </>
+          ) : (
+            <div className="feature-loading" role="status" aria-label="Loading Will's latest watch">
+              <span />
+              <i />
+              <i />
+              <small>Fetching the latest reel...</small>
+            </div>
+          )}
         </div>
         <div className="ticker" aria-hidden="true">
           <span>PLOT ✓</span><span>ACTING ✓</span><span>COOL STUFF ✓</span><span>PRETENSION ✕</span><span>REWATCHABILITY ✓</span>

@@ -43,9 +43,13 @@ test("auto-populates runtime from the selected movie", async () => {
   ]);
 
   assert.match(searchRoute, /wdt:P2047 \?duration/);
+  assert.match(searchRoute, /wdt:P345 \?imdbId/);
+  assert.match(searchRoute, /searchImdb\(titleQuery\)\.then\(enrichImdbMovies\)/);
   assert.match(searchRoute, /runtime: Number\.isInteger\(minutes\)/);
-  assert.match(studio, /setRuntime\(movie\.runtime \? String\(movie\.runtime\) : ""\)/);
-  assert.match(studio, /Runtime <span>Auto-filled<\/span>/);
+  assert.match(studio, /async function chooseMovie\(movie: Movie\)/);
+  assert.match(studio, /setRuntime\(resolvedRuntime \? String\(resolvedRuntime\) : ""\)/);
+  assert.match(studio, /Runtime <span>Auto-filled when listed<\/span>/);
+  assert.match(studio, /Runtime is not listed yet\. Enter it below/);
   assert.match(studio, /form\.set\("runtime", runtime\)/);
 });
 
@@ -63,8 +67,8 @@ test("replaces review numbers with auto-filled movie content ratings", async () 
 
   assert.match(searchRoute, /contentAdvisoryRating/);
   assert.match(searchRoute, /wdt:P1657 \?contentRating/);
-  assert.match(studio, /setContentRating\(movie\.contentRating \?\? ""\)/);
-  assert.match(studio, /Movie rating <span>Auto-filled<\/span>/);
+  assert.match(studio, /setContentRating\(resolvedRating\)/);
+  assert.match(studio, /Movie rating <span>Auto-filled when listed<\/span>/);
   assert.match(studio, /form\.set\("contentRating", contentRating\)/);
   assert.match(studioRoute, /content_rating/);
   assert.match(publicRoute, /contentRating: row\.content_rating/);
@@ -216,6 +220,20 @@ test("shows decimal ratings, the 1-10 scale, and the latest-watch label", async 
   assert.match(home, /What every number actually means/);
 });
 
+test("waits for the live review archive before showing the latest-watch poster", async () => {
+  const [home, styles] = await Promise.all([
+    source("app/page.tsx"),
+    source("app/globals.css"),
+  ]);
+
+  assert.match(home, /const \[reviewsLoaded, setReviewsLoaded\] = useState\(false\)/);
+  assert.match(home, /\.finally\(\(\) => setReviewsLoaded\(true\)\)/);
+  assert.match(home, /\{reviewsLoaded \? \(/);
+  assert.match(home, /Loading Will's latest watch/);
+  assert.match(styles, /\.feature-loading/);
+  assert.match(styles, /@keyframes reel-loading/);
+});
+
 test("shows only verified rent or buy links and tags Amazon automatically", async () => {
   const [home, affiliateRoute, catalog, studio, studioRoute, publicRoute, schema] = await Promise.all([
     source("app/page.tsx"),
@@ -243,7 +261,12 @@ test("shows only verified rent or buy links and tags Amazon automatically", asyn
   assert.doesNotMatch(affiliateRoute, /tv\.apple\.com\/us\/search/);
   assert.match(studio, /name="amazonUrl"/);
   assert.match(studio, /name="appleUrl"/);
-  assert.match(studio, /A blank field keeps that button hidden/);
+  assert.match(studio, /Theater-only movie\? Leave both fields blank/);
+  assert.match(studio, /<form[^>]*noValidate/);
+  assert.doesNotMatch(studio, /name="amazonUrl"[\s\S]{0,250}\brequired\b/);
+  assert.doesNotMatch(studio, /name="appleUrl"[\s\S]{0,250}\brequired\b/);
+  assert.match(studioRoute, /if \(!value\) return true/);
+  assert.match(studioRoute, /rating: ratingValue \? Number\(ratingValue\) : Number\.NaN/);
   assert.match(studioRoute, /amazon_url, apple_url/);
   assert.match(publicRoute, /amazonUrl: row\.amazon_url/);
   assert.match(schema, /amazonUrl: text\("amazon_url"\)/);
