@@ -27,6 +27,7 @@ type Movie = {
   appleUrl?: string;
   poster?: string;
   letterboxdUrl?: string;
+  publishedAt?: string;
 };
 
 type Leader = Movie & { votes: number };
@@ -84,6 +85,9 @@ function WatchLinks({ movie, compact = false }: { movie: Movie; compact?: boolea
 export default function Home() {
   const [reviews, setReviews] = useState<Movie[]>(fallbackReviews);
   const [reviewsLoaded, setReviewsLoaded] = useState(false);
+  const [reviewSearch, setReviewSearch] = useState("");
+  const [reviewSort, setReviewSort] = useState("recent");
+  const [reviewPage, setReviewPage] = useState(0);
   const [leaders, setLeaders] = useState<Leader[]>([]);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Movie[]>([]);
@@ -173,6 +177,37 @@ export default function Home() {
     () => ["Surprise me", ...genreFilters.filter((item) => reviews.some((movie) => matchesGenre(movie, item)))],
     [reviews],
   );
+
+  const filteredReviews = useMemo(() => {
+    const search = reviewSearch.trim().toLowerCase();
+    return reviews
+      .map((movie, index) => ({ movie, index }))
+      .filter(({ movie }) => !search || [
+        movie.title,
+        movie.year,
+        movie.genre,
+        movie.blurb,
+      ].some((value) => value?.toLowerCase().includes(search)))
+      .sort((a, b) => {
+        if (reviewSort === "rating-high") {
+          return (b.movie.rating ?? -1) - (a.movie.rating ?? -1) || a.movie.title.localeCompare(b.movie.title);
+        }
+        if (reviewSort === "rating-low") {
+          return (a.movie.rating ?? 11) - (b.movie.rating ?? 11) || a.movie.title.localeCompare(b.movie.title);
+        }
+        if (reviewSort === "title") return a.movie.title.localeCompare(b.movie.title);
+        if (reviewSort === "release") {
+          return Number(b.movie.year || 0) - Number(a.movie.year || 0) || a.movie.title.localeCompare(b.movie.title);
+        }
+        if (reviewSort === "oldest") return b.index - a.index;
+        return a.index - b.index;
+      })
+      .map(({ movie }) => movie);
+  }, [reviewSearch, reviewSort, reviews]);
+
+  const reviewPageCount = Math.max(1, Math.ceil(filteredReviews.length / 10));
+  const currentReviewPage = Math.min(reviewPage, reviewPageCount - 1);
+  const visibleReviews = filteredReviews.slice(currentReviewPage * 10, currentReviewPage * 10 + 10);
 
   async function submitNewsletter(event: FormEvent) {
     event.preventDefault();
@@ -274,8 +309,36 @@ export default function Home() {
           <div><p className="kicker">01 · Recently judged</p><h2>The fresh takes</h2></div>
           <p>Short reviews. Strong feelings.<br />Absolutely no homework required.</p>
         </div>
+        <div className="review-browser" aria-label="Browse Will's movie reviews">
+          <label className="review-search">
+            <span>Search the couch archive</span>
+            <div><i aria-hidden="true">⌕</i><input type="search" value={reviewSearch} onChange={(event) => {
+              setReviewSearch(event.target.value);
+              setReviewPage(0);
+            }} placeholder="Movie, year, genre..." /></div>
+          </label>
+          <label className="review-sort">
+            <span>Arrange the reels</span>
+            <select value={reviewSort} onChange={(event) => {
+              setReviewSort(event.target.value);
+              setReviewPage(0);
+            }}>
+              <option value="recent">Most recently reviewed</option>
+              <option value="rating-high">Highest Will-o-Meter</option>
+              <option value="rating-low">Lowest Will-o-Meter</option>
+              <option value="title">Title A to Z</option>
+              <option value="release">Newest movie release</option>
+              <option value="oldest">Oldest reviewed first</option>
+            </select>
+          </label>
+          <p className="review-count" aria-live="polite">
+            {filteredReviews.length > 0
+              ? `Showing ${currentReviewPage * 10 + 1}-${Math.min(currentReviewPage * 10 + 10, filteredReviews.length)} of ${filteredReviews.length} takes`
+              : "No takes found"}
+          </p>
+        </div>
         <div className="review-grid">
-          {reviews.map((movie) => (
+          {visibleReviews.map((movie) => (
             <article className="review-card" key={movie.id}>
               <div className="review-card__poster">
                 <Poster movie={movie} />
@@ -301,6 +364,20 @@ export default function Home() {
             </article>
           ))}
         </div>
+        {visibleReviews.length === 0 && (
+          <div className="review-empty">
+            <strong>No reels in that canister.</strong>
+            <p>Try another title, year, or genre.</p>
+            <button type="button" onClick={() => setReviewSearch("")}>Clear the search</button>
+          </div>
+        )}
+        {filteredReviews.length > 10 && (
+          <nav className="review-pagination" aria-label="Review pages">
+            <button type="button" disabled={currentReviewPage === 0} onClick={() => setReviewPage((page) => Math.max(0, page - 1))}>← Previous ten</button>
+            <span>Page <strong>{currentReviewPage + 1}</strong> of {reviewPageCount}</span>
+            <button type="button" disabled={currentReviewPage === reviewPageCount - 1} onClick={() => setReviewPage((page) => Math.min(reviewPageCount - 1, page + 1))}>Next ten →</button>
+          </nav>
+        )}
       </section>
 
       <section className="manifesto">

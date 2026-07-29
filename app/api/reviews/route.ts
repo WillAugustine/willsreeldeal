@@ -100,7 +100,7 @@ export async function GET() {
     const result = await db.prepare(`SELECT id, slug, movie_id, title, release_year, genre, runtime, content_rating,
       rating_tenths, blurb, review_text, favorite_quote, rewatch_odds, watch_party, sleep_risk,
       amazon_url, apple_url, poster_key, poster_content_type, published_at
-      FROM reviews ORDER BY published_at DESC, id DESC LIMIT 24`).all<ReviewRow>();
+      FROM reviews ORDER BY published_at DESC, id DESC`).all<ReviewRow>();
     return Response.json({ reviews: result.results.map(serialize) });
   } catch {
     return Response.json({ reviews: [] });

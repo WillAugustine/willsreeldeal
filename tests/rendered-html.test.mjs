@@ -349,3 +349,24 @@ test("validates poster files before publishing and explains upload failures", as
   assert.match(studio, /responseText = await response\.text\(\)/);
   assert.match(studio, /expected pattern/i);
 });
+
+test("shows ten searchable reviews at a time with useful sorting", async () => {
+  const [home, reviewsRoute, styles] = await Promise.all([
+    source("app/page.tsx"),
+    source("app/api/reviews/route.ts"),
+    source("app/globals.css"),
+  ]);
+
+  assert.match(home, /filteredReviews\.slice\(currentReviewPage \* 10, currentReviewPage \* 10 \+ 10\)/);
+  assert.match(home, /Most recently reviewed/);
+  assert.match(home, /Highest Will-o-Meter/);
+  assert.match(home, /Lowest Will-o-Meter/);
+  assert.match(home, /Title A to Z/);
+  assert.match(home, /placeholder="Movie, year, genre\.\.\."/);
+  assert.match(home, /reviewPageCount/);
+  assert.match(home, /Previous ten/);
+  assert.match(home, /Next ten/);
+  assert.doesNotMatch(reviewsRoute, /LIMIT 24/);
+  assert.match(styles, /\.review-browser/);
+  assert.match(styles, /\.review-pagination/);
+});
