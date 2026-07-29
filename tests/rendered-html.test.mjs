@@ -17,8 +17,8 @@ test("keeps poster selection inside Will's review studio", async () => {
   assert.doesNotMatch(home, /poster-picker|Choose poster|Pick this poster/i);
   assert.match(home, /fetch\("\/api\/reviews"\)/);
   assert.match(studio, /type="file"/);
-  assert.match(studio, /accept="image\/jpeg,image\/png,image\/webp"/);
-  assert.match(studio, /fetch\("\/studio\/api\/reviews", \{ method: editingId \? "PUT" : "POST"/);
+  assert.match(studio, /accept="\.jpg,\.jpeg,\.png,\.webp,image\/jpeg,image\/png,image\/webp"/);
+  assert.match(studio, /fetch\(new URL\("\/studio\/api\/reviews", window\.location\.origin\)/);
 });
 
 test("uses a typo-proof genre checklist for new reviews", async () => {
@@ -337,4 +337,15 @@ test("builds personal suggestions only from Will's reviewed movies", async () =>
   assert.match(home, /Will’s picks for tonight/);
   assert.doesNotMatch(home, /const moodMovies/);
   assert.doesNotMatch(home, /title: "Palm Springs"/);
+});
+
+test("validates poster files before publishing and explains upload failures", async () => {
+  const studio = await source("app/studio/StudioForm.tsx");
+
+  assert.match(studio, /SUPPORTED_POSTER_TYPES = new Set\(\["image\/jpeg", "image\/png", "image\/webp"\]\)/);
+  assert.match(studio, /MAX_POSTER_BYTES = 8 \* 1024 \* 1024/);
+  assert.match(studio, /posterFileProblem\(poster\)/);
+  assert.match(studio, /JPG, PNG, or WebP poster smaller than 8 MB/);
+  assert.match(studio, /responseText = await response\.text\(\)/);
+  assert.match(studio, /expected pattern/i);
 });

@@ -11,6 +11,9 @@ import {
 } from "../review-experience";
 
 type Movie = { id: string; title: string; year: string; runtime: number | null; contentRating?: string };
+const MAX_POSTER_BYTES = 8 * 1024 * 1024;
+const SUPPORTED_POSTER_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const POSTER_HELP = "Use a JPG, PNG, or WebP poster smaller than 8 MB.";
 type PublishedReview = {
   id: string;
   movieId: string;
@@ -38,6 +41,7 @@ export default function StudioForm() {
   const [selected, setSelected] = useState<Movie | null>(null);
   const [searching, setSearching] = useState(false);
   const [posterPreview, setPosterPreview] = useState("");
+  const [posterProblem, setPosterProblem] = useState("");
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [runtime, setRuntime] = useState("");
   const [contentRating, setContentRating] = useState("");
@@ -103,10 +107,43 @@ export default function StudioForm() {
     };
   }, []);
 
+  function posterFileProblem(file: File) {
+    if (!SUPPORTED_POSTER_TYPES.has(file.type)) {
+      return `${file.name} is not a supported image. ${POSTER_HELP}`;
+    }
+    if (file.size === 0) return `${file.name} is empty or could not be read. Export a fresh copy and try again.`;
+    if (file.size > MAX_POSTER_BYTES) {
+      return `${file.name} is ${(file.size / (1024 * 1024)).toFixed(1)} MB. ${POSTER_HELP}`;
+    }
+    return "";
+  }
+
   function previewPoster(file?: File) {
     if (posterObjectUrl.current) URL.revokeObjectURL(posterObjectUrl.current);
-    posterObjectUrl.current = file ? URL.createObjectURL(file) : "";
+    posterObjectUrl.current = "";
+    setPosterProblem("");
+    if (!file) {
+      setPosterPreview("");
+      return true;
+    }
+    const problem = posterFileProblem(file);
+    if (problem) {
+      setPosterProblem(problem);
+      setPosterPreview("");
+      setMessage(problem);
+      return false;
+    }
+    try {
+      posterObjectUrl.current = URL.createObjectURL(file);
+    } catch {
+      const unreadable = `The browser could not open ${file.name}. Export it as a new JPG, PNG, or WebP and try again.`;
+      setPosterProblem(unreadable);
+      setPosterPreview("");
+      setMessage(unreadable);
+      return false;
+    }
     setPosterPreview(posterObjectUrl.current);
+    return true;
   }
 
   function clearEditor(nextMessage = "") {
@@ -157,6 +194,7 @@ export default function StudioForm() {
     setAmazonUrl(review.amazonUrl ?? "");
     setAppleUrl(review.appleUrl ?? "");
     setPosterPreview(review.poster);
+    setPosterProblem("");
     setMessage(`Editing ${review.title}. The current poster stays unless you choose a new one.`);
     window.setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   }
@@ -219,6 +257,20 @@ export default function StudioForm() {
       setMessage("Select the movie from search first.");
       return;
     }
+    const posterInput = event.currentTarget.elements.namedItem("poster") as HTMLInputElement | null;
+    const poster = posterInput?.files?.[0];
+    if (!editingId && !poster) {
+      setMessage("Upload one poster image before publishing.");
+      return;
+    }
+    if (poster) {
+      const problem = posterFileProblem(poster);
+      if (problem) {
+        setPosterProblem(problem);
+        setMessage(problem);
+        return;
+      }
+    }
     setPublishing(true);
     setMessage("Warming up the projector...");
     const form = new FormData(event.currentTarget);
@@ -234,8 +286,21 @@ export default function StudioForm() {
     if (editingId) form.set("reviewId", editingId);
 
     try {
-      const response = await fetch("/studio/api/reviews", { method: editingId ? "PUT" : "POST", body: form });
-      const data = await response.json();
+      const response = await fetch(new URL("/studio/api/reviews", window.location.origin), {
+        method: editingId ? "PUT" : "POST",
+        body: form,
+      });
+      const responseText = await response.text();
+      let data: { error?: string; review?: PublishedReview } = {};
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        if (!response.ok) {
+          throw new Error(poster
+            ? `The poster upload was rejected before it reached the Studio. ${POSTER_HELP}`
+            : editingId ? "Saving failed." : "Publishing failed.");
+        }
+      }
       if (!response.ok) throw new Error(data.error ?? (editingId ? "Saving failed." : "Publishing failed."));
       const savedTitle = selected.title;
       if (data.review) {
@@ -249,7 +314,12 @@ export default function StudioForm() {
         ? `${savedTitle} has been updated everywhere. Nice tune-up.`
         : `${savedTitle} is live. Excellent work, boss.`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "The projector jammed. Try again.");
+      const rawMessage = error instanceof Error ? error.message : "";
+      setMessage(
+        poster && /expected pattern/i.test(rawMessage)
+          ? `The browser could not upload that poster. ${POSTER_HELP}`
+          : rawMessage || "The projector jammed. Try again.",
+      );
     } finally {
       setPublishing(false);
     }
@@ -497,15 +567,37 @@ export default function StudioForm() {
         <div className="studio-field">
           <label htmlFor="poster">Poster art {editingId && <span>Optional when editing</span>}</label>
           <label className={`poster-drop ${posterPreview ? "poster-drop--has-image" : ""}`} htmlFor="poster">
-            {posterPreview ? <img src={posterPreview} alt="Poster preview" /> : <><strong>Drop in the poster</strong><span>Portrait art works best</span><i>Choose image</i></>}
+            {posterPreview ? (
+              <img
+                src={posterPreview}
+                alt="Poster preview"
+                onError={() => {
+                  if (!posterObjectUrl.current) return;
+                  const unreadable = "The browser could not read that poster. Export it as a new JPG, PNG, or WebP and try again.";
+                  setPosterProblem(unreadable);
+                  setMessage(unreadable);
+                }}
+              />
+            ) : <><strong>Drop in the poster</strong><span>JPG, PNG, or WebP under 8 MB</span><i>Choose image</i></>}
           </label>
-          <input className="poster-input" id="poster" name="poster" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => previewPoster(event.target.files?.[0])} required={!editingId} />
+          <input
+            className="poster-input"
+            id="poster"
+            name="poster"
+            type="file"
+            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+            onChange={(event) => {
+              if (!previewPoster(event.target.files?.[0])) event.currentTarget.value = "";
+            }}
+            required={!editingId}
+          />
+          {posterProblem && <p className="studio-field-note studio-field-note--error" role="alert">{posterProblem}</p>}
         </div>
 
         <div className="studio-submit">
           <p aria-live="polite">{message || "Publishing makes the review visible on the homepage immediately."}</p>
           {editingId && <button className="studio-cancel-edit" type="button" onClick={() => clearEditor("No changes made.")}>Cancel</button>}
-          <button className="button button--lime" type="submit" disabled={publishing || !selected || selectedGenres.length === 0 || !runtime}>
+          <button className="button button--lime" type="submit" disabled={publishing || !selected || selectedGenres.length === 0 || !runtime || Boolean(posterProblem)}>
             {publishing ? "Saving..." : editingId ? "Save the tune-up" : "Publish the take"}<span>↗</span>
           </button>
         </div>
