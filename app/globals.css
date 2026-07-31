@@ -211,6 +211,18 @@ legend span { display: inline-grid; place-items: center; width: 27px; height: 27
 .selected-movie { margin: 8px 0; border: 1px solid var(--forest); background: var(--lime); display: grid; grid-template-columns: auto 1fr auto auto; gap: 12px; align-items: center; padding: 12px 15px; }
 .selected-movie span { font-size: 8px; text-transform: uppercase; letter-spacing: .1em; }
 .selected-movie button { background: transparent; border: 0; text-decoration: underline; cursor: pointer; }
+.request-alert { margin-top: 12px; padding: 14px 15px; border: 1px solid rgba(16,40,28,.25); background: rgba(255,255,255,.45); transition: background .2s, border-color .2s; }
+.request-alert--active { border-color: var(--forest); background: #edf4d0; }
+.request-alert__choice { display: grid; grid-template-columns: 18px 1fr; gap: 10px; align-items: center; cursor: pointer; }
+.request-alert__choice input { position: absolute; opacity: 0; pointer-events: none; }
+.request-alert__choice > span { width: 18px; height: 18px; border: 1px solid var(--forest); background: white; display: grid; place-items: center; }
+.request-alert__choice input:checked + span { background: var(--forest); box-shadow: inset 0 0 0 4px #edf4d0; }
+.request-alert__choice input:focus-visible + span { outline: 2px solid var(--orange); outline-offset: 2px; }
+.request-alert__choice strong { font: 700 14px/1.2 Georgia, serif; }
+.request-alert > p { margin: 7px 0 0 28px; color: #54705e; font-size: 10px; line-height: 1.45; }
+.request-alert__email { display: grid; gap: 7px; margin: 14px 0 0 28px; color: #405b4b; font-size: 8px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.request-alert__email input { width: 100%; height: 46px; padding: 0 12px; border: 1px solid var(--forest); background: white; color: var(--forest-dark); font: 12px Arial, sans-serif; letter-spacing: 0; text-transform: none; outline: 0; }
+.request-alert__email input:focus { box-shadow: 0 0 0 2px var(--orange); }
 .request form .button { margin-top: 12px; }
 .form-message { min-height: 18px; font-size: 11px; color: #536b5c; }
 .leaderboard { background: var(--forest); color: var(--cream); padding: 105px 70px; margin-right: min(-30px, calc((1320px - 100vw) / 2)); }

@@ -50,6 +50,13 @@
       "when": 1784900884107,
       "tag": "0006_lethal_scarecrow",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1785541602649,
+      "tag": "0007_bumpy_rage",
+      "breakpoints": true
     }
   ]
 }

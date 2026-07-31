@@ -370,3 +370,39 @@ test("shows ten searchable reviews at a time with useful sorting", async () => {
   assert.match(styles, /\.review-browser/);
   assert.match(styles, /\.review-pagination/);
 });
+
+test("turns a movie request into one deduplicated review alert", async () => {
+  const [home, community, newsletter, publishRoute, schema, migration, styles, worker] = await Promise.all([
+    source("app/page.tsx"),
+    source("app/api/community/route.ts"),
+    source("app/newsletter-service.ts"),
+    source("app/studio/api/reviews/route.ts"),
+    source("db/schema.ts"),
+    source("drizzle/0007_bumpy_rage.sql"),
+    source("app/globals.css"),
+    source("worker/index.ts"),
+  ]);
+
+  assert.match(home, /Email me when Will reviews this movie/);
+  assert.match(home, /One movie, one email\. This does not add you to Reel Mail/);
+  assert.match(home, /type="email" required maxLength=\{254\}/);
+  assert.match(home, /notificationEmail: requestNotify \? normalizedRequestEmail : undefined/);
+  assert.match(community, /\^\[\^\\s@\]\+@\[\^\\s@\]\+\\\.\[\^\\s@\]\+\$/);
+  assert.match(community, /ON CONFLICT\(movie_id, email\) DO UPDATE SET/);
+  assert.match(community, /Will has already reviewed that movie/);
+  assert.match(newsletter, /LEFT JOIN newsletter_subscribers s ON LOWER\(s\.email\) = LOWER\(n\.email\)/);
+  assert.match(newsletter, /subscriber\.frequency === "instant"/);
+  assert.match(newsletter, /instantNewsletterDelivered/);
+  assert.match(newsletter, /"\/emails\/batch"/);
+  assert.match(newsletter, /"Idempotency-Key"/);
+  assert.match(newsletter, /DELETE FROM movie_requests WHERE movie_id = \?/);
+  assert.match(newsletter, /DELETE FROM movie_request_notifications WHERE id = \?/);
+  assert.match(publishRoute, /sendRequestedMovieNotifications/);
+  assert.match(publishRoute, /newsletter\.status === "sent"/);
+  assert.match(publishRoute, /newsletter\.delivered === true/);
+  assert.match(schema, /sqliteTable\("movie_request_notifications"/);
+  assert.match(migration, /CREATE TABLE `movie_request_notifications`/);
+  assert.match(styles, /\.request-alert--active/);
+  assert.match(worker, /retryRequestedMovieNotifications/);
+  assert.match(newsletter, /status IN \('sent', 'sending'\)/);
+});

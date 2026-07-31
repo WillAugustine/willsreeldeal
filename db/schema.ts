@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const newsletterSubscribers = sqliteTable("newsletter_subscribers", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -37,6 +37,19 @@ export const movieRequests = sqliteTable("movie_requests", {
   votes: integer("votes").notNull().default(1),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
+
+export const movieRequestNotifications = sqliteTable("movie_request_notifications", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  movieId: text("movie_id").notNull(),
+  title: text("title").notNull(),
+  releaseYear: text("release_year").notNull().default(""),
+  email: text("email").notNull(),
+  lastError: text("last_error"),
+  attemptedAt: text("attempted_at"),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  uniqueIndex("movie_request_notifications_movie_email_unique").on(table.movieId, table.email),
+]);
 
 export const studioOwner = sqliteTable("studio_owner", {
   id: integer("id").primaryKey(),

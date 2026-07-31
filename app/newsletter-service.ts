@@ -20,6 +20,7 @@ type SubscriberRow = {
 type ReviewForEmail = {
   id: number;
   slug: string;
+  movie_id: string;
   title: string;
   release_year: string;
   rating_tenths: number;
@@ -39,6 +40,12 @@ type ResendResponse = {
   error?: { message?: string };
 };
 
+type MovieNotificationRow = {
+  id: number;
+  email: string;
+  frequency: "instant" | "biweekly" | null;
+};
+
 const RESEND_API = "https://api.resend.com";
 const DEFAULT_FROM = "Will's Reel Deal <reelmail@updates.willsreeldeal.com>";
 const DEFAULT_SITE_URL = "https://willsreeldeal.com";
@@ -56,12 +63,12 @@ function siteUrl(runtimeEnv: NewsletterEnv) {
   return (runtimeEnv.NEWSLETTER_SITE_URL || DEFAULT_SITE_URL).replace(/\/+$/, "");
 }
 
-async function resendRequest(
+async function resendRequest<T = ResendResponse>(
   runtimeEnv: NewsletterEnv,
   path: string,
   init: RequestInit,
   allowNotFound = false,
-) {
+): Promise<T | null> {
   if (!runtimeEnv.RESEND_API_KEY) throw new Error("RESEND_API_KEY is not configured");
   const response = await fetch(`${RESEND_API}${path}`, {
     ...init,
@@ -77,7 +84,7 @@ async function resendRequest(
   if (!response.ok) {
     throw new Error(data.message || data.error?.message || `Resend request failed with ${response.status}`);
   }
-  return data;
+  return data as T;
 }
 
 export async function ensureNewsletterTables(db: D1Database) {
@@ -108,8 +115,20 @@ export async function ensureNewsletterTables(db: D1Database) {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       completed_at TEXT
     )`),
+    db.prepare(`CREATE TABLE IF NOT EXISTS movie_request_notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      movie_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      release_year TEXT NOT NULL DEFAULT '',
+      email TEXT NOT NULL,
+      last_error TEXT,
+      attempted_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(movie_id, email)
+    )`),
     db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS newsletter_subscribers_email_unique ON newsletter_subscribers (email)"),
     db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS newsletter_sends_send_key_unique ON newsletter_sends (send_key)"),
+    db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS movie_request_notifications_movie_email_unique ON movie_request_notifications (movie_id, email)"),
   ]);
 }
 
@@ -241,7 +260,7 @@ export async function syncNewsletterSubscriber(
   return { status: "ready" as const };
 }
 
-function emailShell(content: string, preheader: string, runtimeEnv: NewsletterEnv) {
+function emailShell(content: string, preheader: string, runtimeEnv: NewsletterEnv, footer?: string) {
   const root = siteUrl(runtimeEnv);
   return `<!doctype html>
   <html lang="en">
@@ -257,15 +276,101 @@ function emailShell(content: string, preheader: string, runtimeEnv: NewsletterEn
             </td></tr>
             <tr><td style="padding:34px 30px;">${content}</td></tr>
             <tr><td style="padding:24px 30px;background:#e97443;color:#10281c;font-size:12px;line-height:1.55;">
-              You picked your preferred Reel Mail schedule when you signed up.
+              ${footer ?? `You picked your preferred Reel Mail schedule when you signed up.
               <a href="{{{RESEND_UNSUBSCRIBE_URL}}}" style="color:#10281c;font-weight:700;">Change preferences or unsubscribe</a>.
-              <div style="margin-top:10px;">Will's Reel Deal, Denver, Colorado</div>
+              <div style="margin-top:10px;">Will's Reel Deal, Denver, Colorado</div>`}
             </td></tr>
           </table>
         </td></tr>
       </table>
     </body>
   </html>`;
+}
+
+function requestedMovieEmail(review: ReviewForEmail, runtimeEnv: NewsletterEnv) {
+  const root = siteUrl(runtimeEnv);
+  const rating = (review.rating_tenths / 10).toFixed(1);
+  const content = `
+    <p style="margin:0 0 9px;color:#49715d;font-size:11px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;">Your popcorn petition worked</p>
+    <h1 style="margin:0 0 18px;font:700 43px/1 Georgia,serif;letter-spacing:-1.5px;">Will reviewed ${escapeHtml(review.title)}</h1>
+    <img src="${root}/api/posters/${encodeURIComponent(review.poster_key)}" alt="Poster for ${escapeHtml(review.title)}" width="210" style="display:block;width:210px;max-width:100%;height:auto;margin:0 0 24px;border:0;">
+    <p style="margin:0 0 12px;font-size:18px;line-height:1.45;"><strong>Will-o-Meter: ${rating}/10</strong></p>
+    <p style="margin:0 0 24px;font:italic 20px/1.45 Georgia,serif;">&quot;${escapeHtml(review.blurb)}&quot;</p>
+    <a href="${root}/#reviews" style="display:inline-block;background:#d7f15b;color:#10281c;padding:14px 20px;text-decoration:none;font-size:12px;font-weight:900;letter-spacing:.5px;">READ WILL'S FULL TAKE</a>`;
+  const footer = `You asked for one email when Will reviewed ${escapeHtml(review.title)}. This alert is now complete, and it did not add you to Reel Mail.
+    <div style="margin-top:10px;">Will's Reel Deal, Denver, Colorado</div>`;
+  return {
+    subject: `You requested it: Will reviewed ${review.title}`,
+    html: emailShell(content, `Will reviewed ${review.title}.`, runtimeEnv, footer),
+  };
+}
+
+async function deleteNotifications(db: D1Database, ids: number[]) {
+  if (!ids.length) return;
+  await db.batch(ids.map((id) => db.prepare("DELETE FROM movie_request_notifications WHERE id = ?").bind(id)));
+}
+
+export async function sendRequestedMovieNotifications(
+  db: D1Database,
+  runtimeEnv: NewsletterEnv,
+  review: ReviewForEmail,
+  instantNewsletterDelivered: boolean,
+) {
+  try {
+    await ensureNewsletterTables(db);
+    const notifications = await db.prepare(`SELECT n.id, n.email, s.frequency
+      FROM movie_request_notifications n
+      LEFT JOIN newsletter_subscribers s ON LOWER(s.email) = LOWER(n.email)
+      WHERE n.movie_id = ? OR (LOWER(TRIM(n.title)) = LOWER(TRIM(?)) AND n.release_year = ?)`)
+      .bind(review.movie_id, review.title, review.release_year)
+      .all<MovieNotificationRow>();
+
+    await db.prepare(`DELETE FROM movie_requests WHERE movie_id = ?
+      OR (LOWER(TRIM(title)) = LOWER(TRIM(?)) AND release_year = ?)`)
+      .bind(review.movie_id, review.title, review.release_year)
+      .run();
+
+    if (!notifications.results.length) return { status: "no_subscribers" as const, sent: 0 };
+
+    const covered = instantNewsletterDelivered
+      ? notifications.results.filter((subscriber) => subscriber.frequency === "instant")
+      : [];
+    await deleteNotifications(db, covered.map((subscriber) => subscriber.id));
+    const recipients = notifications.results.filter((subscriber) => !covered.some((item) => item.id === subscriber.id));
+    if (!recipients.length) return { status: "covered_by_newsletter" as const, sent: 0 };
+    if (!runtimeEnv.RESEND_API_KEY) return { status: "pending" as const, sent: 0 };
+
+    const email = requestedMovieEmail(review, runtimeEnv);
+    let sent = 0;
+    for (let index = 0; index < recipients.length; index += 100) {
+      const batch = recipients.slice(index, index + 100);
+      try {
+        await resendRequest<ResendResponse[]>(runtimeEnv, "/emails/batch", {
+          method: "POST",
+          headers: { "Idempotency-Key": `movie-alert:${review.id}:${batch[0].id}-${batch.at(-1)?.id}` },
+          body: JSON.stringify(batch.map((subscriber) => ({
+            from: runtimeEnv.NEWSLETTER_FROM || DEFAULT_FROM,
+            ...(runtimeEnv.NEWSLETTER_REPLY_TO ? { reply_to: runtimeEnv.NEWSLETTER_REPLY_TO } : {}),
+            to: [subscriber.email],
+            subject: email.subject,
+            html: email.html,
+          }))),
+        });
+        await deleteNotifications(db, batch.map((subscriber) => subscriber.id));
+        sent += batch.length;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown movie alert error";
+        await db.batch(batch.map((subscriber) => db.prepare(`UPDATE movie_request_notifications
+          SET last_error = ?, attempted_at = CURRENT_TIMESTAMP WHERE id = ?`)
+          .bind(message.slice(0, 500), subscriber.id)));
+        return { status: "failed" as const, sent, error: message };
+      }
+    }
+    return { status: "sent" as const, sent };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown movie alert error";
+    return { status: "failed" as const, sent: 0, error: message };
+  }
 }
 
 function instantEmail(review: ReviewForEmail, runtimeEnv: NewsletterEnv) {
@@ -370,25 +475,64 @@ export async function sendInstantReview(
   runtimeEnv: NewsletterEnv,
   review: ReviewForEmail,
 ) {
-  const configuration = await ensureResendConfiguration(db, runtimeEnv);
-  if (!configuration) return { status: "pending" as const };
-  const sendKey = `instant:${review.id}`;
-  if (!await reserveSend(db, sendKey, "instant")) return { status: "already_processed" as const };
   try {
+    const configuration = await ensureResendConfiguration(db, runtimeEnv);
+    if (!configuration) return { status: "pending" as const };
+    const sendKey = `instant:${review.id}`;
+    if (!await reserveSend(db, sendKey, "instant")) {
+      const existing = await db.prepare("SELECT status FROM newsletter_sends WHERE send_key = ?")
+        .bind(sendKey)
+        .first<{ status: string }>();
+      return {
+        status: "already_processed" as const,
+        delivered: existing?.status === "sent" || existing?.status === "sending",
+      };
+    }
     const email = instantEmail(review, runtimeEnv);
-    const result = await sendBroadcast(runtimeEnv, {
-      segmentId: configuration.instant_segment_id,
-      topicId: configuration.instant_topic_id,
-      subject: email.subject,
-      html: email.html,
-      name: `New review - ${review.title}`,
-    });
-    await completeSend(db, sendKey, "sent", result?.id);
-    return { status: "sent" as const, id: result?.id };
+    try {
+      const result = await sendBroadcast(runtimeEnv, {
+        segmentId: configuration.instant_segment_id,
+        topicId: configuration.instant_topic_id,
+        subject: email.subject,
+        html: email.html,
+        name: `New review - ${review.title}`,
+      });
+      await completeSend(db, sendKey, "sent", result?.id).catch(() => undefined);
+      return { status: "sent" as const, delivered: true, id: result?.id };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown newsletter error";
+      await completeSend(db, sendKey, "failed", undefined, message).catch(() => undefined);
+      return { status: "failed" as const, delivered: false, error: message };
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown newsletter error";
-    await completeSend(db, sendKey, "failed", undefined, message);
-    return { status: "failed" as const, error: message };
+    return { status: "failed" as const, delivered: false, error: message };
+  }
+}
+
+export async function retryRequestedMovieNotifications(db: D1Database, runtimeEnv: NewsletterEnv) {
+  try {
+    await ensureNewsletterTables(db);
+    const pending = await db.prepare(`SELECT DISTINCT r.id, r.slug, r.movie_id, r.title, r.release_year,
+      r.rating_tenths, r.blurb, r.review_text, r.favorite_quote, r.rewatch_odds, r.watch_party,
+      r.sleep_risk, r.poster_key, r.published_at
+      FROM reviews r
+      INNER JOIN movie_request_notifications n ON n.movie_id = r.movie_id
+        OR (LOWER(TRIM(n.title)) = LOWER(TRIM(r.title)) AND n.release_year = r.release_year)
+      ORDER BY r.published_at ASC, r.id ASC LIMIT 20`).all<ReviewForEmail>();
+    let sent = 0;
+    for (const review of pending.results) {
+      const instantSend = await db.prepare(`SELECT status FROM newsletter_sends
+        WHERE send_key = ? AND status IN ('sent', 'sending') LIMIT 1`)
+        .bind(`instant:${review.id}`)
+        .first<{ status: string }>();
+      const result = await sendRequestedMovieNotifications(db, runtimeEnv, review, Boolean(instantSend));
+      sent += result.sent;
+    }
+    return { status: "complete" as const, reviewed: pending.results.length, sent };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown movie alert retry error";
+    return { status: "failed" as const, reviewed: 0, sent: 0, error: message };
   }
 }
 
@@ -416,7 +560,7 @@ export async function sendBiweeklyDigest(
     .toISOString()
     .slice(0, 19)
     .replace("T", " ");
-  const result = await db.prepare(`SELECT id, slug, title, release_year, rating_tenths, blurb,
+  const result = await db.prepare(`SELECT id, slug, movie_id, title, release_year, rating_tenths, blurb,
     review_text, favorite_quote, rewatch_odds, watch_party, sleep_risk, poster_key, published_at FROM reviews
     WHERE published_at >= ? ORDER BY published_at DESC, id DESC`).bind(since).all<ReviewForEmail>();
   const reviews = result.results;

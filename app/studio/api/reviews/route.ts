@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { getStudioOwner } from "../../../studio-auth";
-import { sendInstantReview } from "../../../newsletter-service";
+import { sendInstantReview, sendRequestedMovieNotifications } from "../../../newsletter-service";
 import { formatReviewGenres, parseReviewGenres } from "../../../genres";
 import { fallbackReviews } from "../../../review-catalog";
 import { getWatchListing } from "../../../watch-catalog";
@@ -323,7 +323,16 @@ export async function POST(request: Request) {
     const newsletter = created
       ? await sendInstantReview(db, runtimeEnv, created)
       : { status: "pending" as const };
-    return Response.json({ ok: true, review: created ? serialize(created) : null, newsletter });
+    const requestNotifications = created
+      ? await sendRequestedMovieNotifications(
+          db,
+          runtimeEnv,
+          created,
+          newsletter.status === "sent"
+            || (newsletter.status === "already_processed" && newsletter.delivered === true),
+        )
+      : { status: "pending" as const };
+    return Response.json({ ok: true, review: created ? serialize(created) : null, newsletter, requestNotifications });
   } catch {
     if (posterKey) await runtimeEnv.POSTERS.delete(posterKey).catch(() => undefined);
     return Response.json({ error: "The projector jammed. Your review was not published." }, { status: 500 });

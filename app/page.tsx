@@ -94,6 +94,8 @@ export default function Home() {
   const [selected, setSelected] = useState<Movie | null>(null);
   const [searching, setSearching] = useState(false);
   const [requestMessage, setRequestMessage] = useState("");
+  const [requestNotify, setRequestNotify] = useState(false);
+  const [requestEmail, setRequestEmail] = useState("");
   const [email, setEmail] = useState("");
   const [frequency, setFrequency] = useState("biweekly");
   const [newsletterMessage, setNewsletterMessage] = useState("");
@@ -229,22 +231,36 @@ export default function Home() {
   async function submitRequest(event: FormEvent) {
     event.preventDefault();
     if (!selected) return;
+    const normalizedRequestEmail = requestEmail.trim().toLowerCase();
+    if (requestNotify && (normalizedRequestEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedRequestEmail))) {
+      setRequestMessage("Add a valid email so I know where to send the review alert.");
+      return;
+    }
     setRequestMessage("Adding your tiny but mighty vote…");
     try {
       const response = await fetch("/api/community", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "request", movie: selected }),
+        body: JSON.stringify({
+          action: "request",
+          movie: selected,
+          notify: requestNotify,
+          notificationEmail: requestNotify ? normalizedRequestEmail : undefined,
+        }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error();
+      if (!response.ok) throw new Error(data.error || "That vote missed the ballot box.");
       setLeaders(data.leaders ?? leaders);
-      setRequestMessage(`${selected.title} got your vote. Democracy!`);
+      setRequestMessage(requestNotify
+        ? `${selected.title} got your vote. I’ll email you when Will reviews it.`
+        : `${selected.title} got your vote. Democracy!`);
       setQuery("");
       setSelected(null);
       setResults([]);
-    } catch {
-      setRequestMessage("That vote missed the ballot box. Give it another go.");
+      setRequestNotify(false);
+      setRequestEmail("");
+    } catch (error) {
+      setRequestMessage(error instanceof Error ? error.message : "That vote missed the ballot box. Give it another go.");
     }
   }
 
@@ -500,6 +516,20 @@ export default function Home() {
               </div>
             )}
             {selected && <div className="selected-movie"><span>Selected</span><strong>{selected.title}</strong><small>{selected.year}</small><button type="button" onClick={() => { setSelected(null); setQuery(""); }}>Change</button></div>}
+            <div className={`request-alert ${requestNotify ? "request-alert--active" : ""}`}>
+              <label className="request-alert__choice">
+                <input type="checkbox" checked={requestNotify} onChange={(event) => setRequestNotify(event.target.checked)} />
+                <span aria-hidden="true" />
+                <strong>Email me when Will reviews this movie</strong>
+              </label>
+              <p>One movie, one email. This does not add you to Reel Mail.</p>
+              {requestNotify && (
+                <label className="request-alert__email" htmlFor="request-alert-email">
+                  Where should the alert go?
+                  <input id="request-alert-email" type="email" required maxLength={254} value={requestEmail} onChange={(event) => setRequestEmail(event.target.value)} placeholder="you@probablywatching.com" autoComplete="email" />
+                </label>
+              )}
+            </div>
             <button className="button button--cream button--wide" disabled={!selected} type="submit">Cast my request <span>↑</span></button>
             <p className="form-message" aria-live="polite">{requestMessage}</p>
           </form>
