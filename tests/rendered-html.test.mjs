@@ -397,6 +397,8 @@ test("turns a movie request into one deduplicated review alert", async () => {
   assert.match(newsletter, /"Idempotency-Key"/);
   assert.match(newsletter, /DELETE FROM movie_requests WHERE movie_id = \?/);
   assert.match(newsletter, /DELETE FROM movie_request_notifications WHERE id = \?/);
+  assert.match(community, /INNER JOIN reviews ON reviews\.movie_id = movie_requests\.movie_id/);
+  assert.match(community, /DELETE FROM movie_requests WHERE movie_id = \?/);
   assert.match(publishRoute, /sendRequestedMovieNotifications/);
   assert.match(publishRoute, /newsletter\.status === "sent"/);
   assert.match(publishRoute, /newsletter\.delivered === true/);

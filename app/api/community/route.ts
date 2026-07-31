@@ -27,6 +27,17 @@ async function database() {
 async function getLeaders(db: D1Database) {
   let requests: Record<string, unknown>[];
   try {
+    const stale = await db.prepare(`SELECT movie_requests.movie_id AS id
+      FROM movie_requests
+      INNER JOIN reviews ON reviews.movie_id = movie_requests.movie_id
+        OR (LOWER(TRIM(reviews.title)) = LOWER(TRIM(movie_requests.title))
+          AND reviews.release_year = movie_requests.release_year)
+      LIMIT 50`).all<{ id: string }>();
+    if (stale.results.length) {
+      await db.batch(stale.results.map((movie) => (
+        db.prepare("DELETE FROM movie_requests WHERE movie_id = ?").bind(movie.id)
+      )));
+    }
     const result = await db.prepare(`SELECT movie_id AS id, title, release_year AS year, votes
       FROM movie_requests
       WHERE NOT EXISTS (
