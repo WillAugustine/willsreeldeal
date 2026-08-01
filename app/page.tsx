@@ -550,7 +550,7 @@ export default function Home() {
                 </li>
               )}
           </ol>
-          <p className="leaderboard__note">Updated whenever someone adds a vote. Yes, your lobbying matters.</p>
+          <p className="leaderboard__note">A movie only leaves this list when Will publishes a review for it. Votes alone never check one off.</p>
         </div>
       </section>
 

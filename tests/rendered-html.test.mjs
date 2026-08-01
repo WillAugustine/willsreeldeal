@@ -408,3 +408,23 @@ test("turns a movie request into one deduplicated review alert", async () => {
   assert.match(worker, /retryRequestedMovieNotifications/);
   assert.match(newsletter, /status IN \('sent', 'sending'\)/);
 });
+
+test("autosaves unfinished studio reviews and explains request completion", async () => {
+  const [studio, home, styles] = await Promise.all([
+    source("app/studio/StudioForm.tsx"),
+    source("app/page.tsx"),
+    source("app/globals.css"),
+  ]);
+
+  assert.match(studio, /wills-reel-deal:studio-draft:v1/);
+  assert.match(studio, /window\.localStorage\.getItem\(STUDIO_DRAFT_KEY\)/);
+  assert.match(studio, /window\.localStorage\.setItem\(STUDIO_DRAFT_KEY, JSON\.stringify\(draft\)\)/);
+  assert.match(studio, /window\.setTimeout\(\(\) => \{/);
+  assert.match(studio, /Restored the draft saved/);
+  assert.match(studio, /Poster files must be chosen again after a refresh/);
+  assert.match(studio, /Discard draft/);
+  assert.match(studio, /window\.localStorage\.removeItem\(STUDIO_DRAFT_KEY\)/);
+  assert.match(styles, /\.studio-draft-status--saved/);
+  assert.match(home, /A movie only leaves this list when Will publishes a review for it/);
+  assert.match(home, /Votes alone never check one off/);
+});

@@ -14,6 +14,7 @@ type Movie = { id: string; title: string; year: string; runtime: number | null; 
 const MAX_POSTER_BYTES = 8 * 1024 * 1024;
 const SUPPORTED_POSTER_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const POSTER_HELP = "Use a JPG, PNG, or WebP poster smaller than 8 MB.";
+const STUDIO_DRAFT_KEY = "wills-reel-deal:studio-draft:v1";
 type PublishedReview = {
   id: string;
   movieId: string;
@@ -34,6 +35,89 @@ type PublishedReview = {
   poster: string;
   publishedAt: string;
 };
+
+type StudioDraft = {
+  version: 1;
+  updatedAt: string;
+  editingId: string;
+  query: string;
+  selected: Movie | null;
+  selectedGenres: string[];
+  runtime: string;
+  contentRating: string;
+  rating: string;
+  blurb: string;
+  reviewText: string;
+  favoriteQuote: string;
+  rewatchOdds: string;
+  watchParties: string[];
+  sleepRisk: string;
+  amazonUrl: string;
+  appleUrl: string;
+  publishedPoster: string;
+};
+
+function parseStudioDraft(value: string): StudioDraft | null {
+  const saved = JSON.parse(value) as Partial<StudioDraft>;
+  if (saved.version !== 1) return null;
+  const movie = saved.selected;
+  const selected = movie
+    && typeof movie.id === "string"
+    && typeof movie.title === "string"
+    && typeof movie.year === "string"
+    ? {
+        id: movie.id,
+        title: movie.title,
+        year: movie.year,
+        runtime: typeof movie.runtime === "number" ? movie.runtime : null,
+        contentRating: typeof movie.contentRating === "string" ? movie.contentRating : "",
+      }
+    : null;
+  return {
+    version: 1,
+    updatedAt: typeof saved.updatedAt === "string" ? saved.updatedAt : "",
+    editingId: typeof saved.editingId === "string" ? saved.editingId : "",
+    query: typeof saved.query === "string" ? saved.query : "",
+    selected,
+    selectedGenres: Array.isArray(saved.selectedGenres)
+      ? saved.selectedGenres.filter((genre): genre is string => typeof genre === "string" && (REVIEW_GENRES as readonly string[]).includes(genre))
+      : [],
+    runtime: typeof saved.runtime === "string" ? saved.runtime : "",
+    contentRating: typeof saved.contentRating === "string" ? saved.contentRating : "",
+    rating: typeof saved.rating === "string" ? saved.rating : "",
+    blurb: typeof saved.blurb === "string" ? saved.blurb : "",
+    reviewText: typeof saved.reviewText === "string" ? saved.reviewText : "",
+    favoriteQuote: typeof saved.favoriteQuote === "string" ? saved.favoriteQuote : "",
+    rewatchOdds: typeof saved.rewatchOdds === "string" && (REWATCH_ODDS as readonly string[]).includes(saved.rewatchOdds) ? saved.rewatchOdds : "",
+    watchParties: Array.isArray(saved.watchParties)
+      ? saved.watchParties.filter((party): party is string => typeof party === "string" && (WATCH_PARTIES as readonly string[]).includes(party))
+      : [],
+    sleepRisk: typeof saved.sleepRisk === "string" && (SLEEP_RISKS as readonly string[]).includes(saved.sleepRisk) ? saved.sleepRisk : "",
+    amazonUrl: typeof saved.amazonUrl === "string" ? saved.amazonUrl : "",
+    appleUrl: typeof saved.appleUrl === "string" ? saved.appleUrl : "",
+    publishedPoster: typeof saved.publishedPoster === "string" ? saved.publishedPoster : "",
+  };
+}
+
+function hasDraftContent(draft: StudioDraft) {
+  return Boolean(
+    draft.editingId
+      || draft.selected
+      || draft.query.trim()
+      || draft.selectedGenres.length
+      || draft.runtime
+      || draft.contentRating
+      || draft.rating
+      || draft.blurb.trim()
+      || draft.reviewText.trim()
+      || draft.favoriteQuote.trim()
+      || draft.rewatchOdds
+      || draft.watchParties.length
+      || draft.sleepRisk
+      || draft.amazonUrl.trim()
+      || draft.appleUrl.trim(),
+  );
+}
 
 export default function StudioForm() {
   const [query, setQuery] = useState("");
@@ -61,9 +145,112 @@ export default function StudioForm() {
   const [reviews, setReviews] = useState<PublishedReview[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(true);
   const [editingId, setEditingId] = useState("");
+  const [draftReady, setDraftReady] = useState(false);
+  const [hasSavedDraft, setHasSavedDraft] = useState(false);
+  const [draftStatus, setDraftStatus] = useState("Checking for a saved draft...");
   const formRef = useRef<HTMLFormElement>(null);
   const posterObjectUrl = useRef("");
   const movieDetailsController = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    const restoreTimer = window.setTimeout(() => {
+      try {
+        const rawDraft = window.localStorage.getItem(STUDIO_DRAFT_KEY);
+        const draft = rawDraft ? parseStudioDraft(rawDraft) : null;
+        if (draft && hasDraftContent(draft)) {
+          setEditingId(draft.editingId);
+          setQuery(draft.query);
+          setSelected(draft.selected);
+          setSelectedGenres(draft.selectedGenres);
+          setRuntime(draft.runtime);
+          setContentRating(draft.contentRating);
+          setRating(draft.rating);
+          setBlurb(draft.blurb);
+          setReviewText(draft.reviewText);
+          setFavoriteQuote(draft.favoriteQuote);
+          setRewatchOdds(draft.rewatchOdds);
+          setWatchParties(draft.watchParties);
+          setSleepRisk(draft.sleepRisk);
+          setAmazonUrl(draft.amazonUrl);
+          setAppleUrl(draft.appleUrl);
+          setPosterPreview(draft.publishedPoster);
+          setHasSavedDraft(true);
+          const savedTime = draft.updatedAt ? new Date(draft.updatedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "earlier";
+          setDraftStatus(`Restored the draft saved ${savedTime}.`);
+          setMessage("Your saved draft is back. Choose the poster again if this is a new review.");
+        } else {
+          setDraftStatus("Autosave is on. Your work will survive a refresh.");
+        }
+      } catch {
+        setDraftStatus("Draft saving is unavailable in this browser.");
+      } finally {
+        setDraftReady(true);
+      }
+    }, 0);
+    return () => window.clearTimeout(restoreTimer);
+  }, []);
+
+  useEffect(() => {
+    if (!draftReady) return;
+    const draft: StudioDraft = {
+      version: 1,
+      updatedAt: new Date().toISOString(),
+      editingId,
+      query,
+      selected,
+      selectedGenres,
+      runtime,
+      contentRating,
+      rating,
+      blurb,
+      reviewText,
+      favoriteQuote,
+      rewatchOdds,
+      watchParties,
+      sleepRisk,
+      amazonUrl,
+      appleUrl,
+      publishedPoster: editingId && !posterObjectUrl.current ? posterPreview : "",
+    };
+    if (!hasDraftContent(draft)) {
+      try {
+        window.localStorage.removeItem(STUDIO_DRAFT_KEY);
+      } catch {
+        // The form still works when browser storage is unavailable.
+      }
+      setHasSavedDraft(false);
+      setDraftStatus("Autosave is on. Your work will survive a refresh.");
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(STUDIO_DRAFT_KEY, JSON.stringify(draft));
+        setHasSavedDraft(true);
+        setDraftStatus(`Draft saved at ${new Date(draft.updatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`);
+      } catch {
+        setDraftStatus("Draft saving is unavailable in this browser.");
+      }
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [
+    amazonUrl,
+    appleUrl,
+    blurb,
+    contentRating,
+    draftReady,
+    editingId,
+    favoriteQuote,
+    posterPreview,
+    query,
+    rating,
+    reviewText,
+    rewatchOdds,
+    runtime,
+    selected,
+    selectedGenres,
+    sleepRisk,
+    watchParties,
+  ]);
 
   useEffect(() => {
     if (selected && query === selected.title) return;
@@ -168,6 +355,13 @@ export default function StudioForm() {
     setSleepRisk("");
     setAmazonUrl("");
     setAppleUrl("");
+    try {
+      window.localStorage.removeItem(STUDIO_DRAFT_KEY);
+    } catch {
+      // Clearing the editor should still work when browser storage is unavailable.
+    }
+    setHasSavedDraft(false);
+    setDraftStatus("Autosave is on. Your work will survive a refresh.");
     setMessage(nextMessage);
   }
 
@@ -361,6 +555,15 @@ export default function StudioForm() {
         <div className="studio-form__heading">
           <span>{editingId ? "Edit published review" : "New review"}</span>
           <strong>{editingId ? "EDIT" : "01"}</strong>
+        </div>
+
+        <div className={`studio-draft-status ${hasSavedDraft ? "studio-draft-status--saved" : ""}`}>
+          <span aria-hidden="true">●</span>
+          <div>
+            <strong>Draft autosave</strong>
+            <p aria-live="polite">{draftStatus} Poster files must be chosen again after a refresh.</p>
+          </div>
+          {hasSavedDraft && <button type="button" onClick={() => clearEditor("Saved draft discarded. Ready for a fresh take.")}>Discard draft</button>}
         </div>
 
         <div className="studio-field studio-movie-field">

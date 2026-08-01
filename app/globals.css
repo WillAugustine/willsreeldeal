@@ -305,6 +305,13 @@ footer > p { margin: 0; color: rgba(244,240,223,.53); font-size: 10px; line-heig
 .studio-form--editing { box-shadow: 14px 14px 0 var(--orange); }
 .studio-form__heading { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(16,40,28,.2); margin-bottom: 32px; padding-bottom: 20px; color: #557060; font-size: 10px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
 .studio-form__heading strong { min-width: 44px; height: 44px; border-radius: 22px; background: var(--forest); color: var(--lime); display: grid; place-items: center; padding: 0 10px; font: 800 12px Georgia, serif; }
+.studio-draft-status { margin: -12px 0 30px; border: 1px solid rgba(16,40,28,.2); background: #e8eadb; display: grid; grid-template-columns: auto 1fr auto; gap: 11px; align-items: center; padding: 13px 15px; }
+.studio-draft-status > span { color: #8b9a91; font-size: 10px; }
+.studio-draft-status--saved > span { color: #2f7d4f; }
+.studio-draft-status strong { display: block; color: var(--forest); font: 800 10px Arial, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+.studio-draft-status p { margin: 4px 0 0; color: #587062; font-size: 9px; line-height: 1.4; }
+.studio-draft-status button { border: 0; border-bottom: 1px solid rgba(16,40,28,.45); background: transparent; color: var(--forest); padding: 5px 0; cursor: pointer; font-size: 8px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.studio-draft-status button:hover { border-color: var(--orange); color: #9a3d1c; }
 .studio-field { position: relative; margin-bottom: 26px; }
 .studio-field > label:first-child { display: block; margin-bottom: 9px; font-size: 9px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
 .studio-field > label:first-child > span { float: right; color: #60776a; font-size: 8px; letter-spacing: .08em; }
@@ -449,6 +456,8 @@ footer > p { margin: 0; color: rgba(244,240,223,.53); font-size: 10px; line-heig
   .studio-review-list button { grid-column: 2; justify-self: start; }
   .studio-form { padding: 26px 16px; box-shadow: 7px 7px 0 var(--lime); }
   .studio-form--editing { box-shadow: 7px 7px 0 var(--orange); }
+  .studio-draft-status { grid-template-columns: auto 1fr; }
+  .studio-draft-status button { grid-column: 2; justify-self: start; }
   .studio-form__row { grid-template-columns: 1fr 1fr; }
   .studio-form__row .studio-field:first-child { grid-column: 1 / -1; }
   .studio-form__row--numbers .studio-field:first-child { grid-column: auto; }
