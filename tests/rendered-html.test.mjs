@@ -339,13 +339,23 @@ test("builds personal suggestions only from Will's reviewed movies", async () =>
   assert.doesNotMatch(home, /title: "Palm Springs"/);
 });
 
-test("validates poster files before publishing and explains upload failures", async () => {
-  const studio = await source("app/studio/StudioForm.tsx");
+test("compresses poster files before publishing and explains upload failures", async () => {
+  const [studio, studioPage] = await Promise.all([
+    source("app/studio/StudioForm.tsx"),
+    source("app/studio/page.tsx"),
+  ]);
 
   assert.match(studio, /SUPPORTED_POSTER_TYPES = new Set\(\["image\/jpeg", "image\/png", "image\/webp"\]\)/);
   assert.match(studio, /MAX_POSTER_BYTES = 8 \* 1024 \* 1024/);
-  assert.match(studio, /posterFileProblem\(poster\)/);
-  assert.match(studio, /JPG, PNG, or WebP poster smaller than 8 MB/);
+  assert.match(studio, /MAX_POSTER_SOURCE_BYTES = 25 \* 1024 \* 1024/);
+  assert.match(studio, /POSTER_MAX_WIDTH = 1200/);
+  assert.match(studio, /POSTER_MAX_HEIGHT = 1800/);
+  assert.match(studio, /POSTER_WEBP_QUALITY = 0\.82/);
+  assert.match(studio, /canvas\.toBlob\(/);
+  assert.match(studio, /form\.set\("poster", poster, poster\.name\)/);
+  assert.match(studio, /Compressed \$\{originalSize\} to \$\{finalSize\}/);
+  assert.match(studio, /The Studio compresses it automatically/);
+  assert.match(studioPage, /The Studio compresses it for you/);
   assert.match(studio, /responseText = await response\.text\(\)/);
   assert.match(studio, /expected pattern/i);
 });

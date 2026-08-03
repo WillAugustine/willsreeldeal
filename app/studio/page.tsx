@@ -28,7 +28,7 @@ export default async function StudioPage() {
           <p>Pick the official movie, upload one poster, write what actually mattered, and send it straight to the homepage.</p>
           <div className="studio-intro__note">
             <strong>Poster recipe</strong>
-            <span>Use a portrait image near a 2:3 ratio. JPG, PNG, or WebP. Maximum 8 MB.</span>
+            <span>Use a portrait image near a 2:3 ratio. JPG, PNG, or WebP up to 25 MB. The Studio compresses it for you.</span>
           </div>
         </div>
         <StudioForm />

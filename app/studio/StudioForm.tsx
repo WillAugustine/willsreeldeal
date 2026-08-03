@@ -12,8 +12,12 @@ import {
 
 type Movie = { id: string; title: string; year: string; runtime: number | null; contentRating?: string };
 const MAX_POSTER_BYTES = 8 * 1024 * 1024;
+const MAX_POSTER_SOURCE_BYTES = 25 * 1024 * 1024;
+const POSTER_MAX_WIDTH = 1200;
+const POSTER_MAX_HEIGHT = 1800;
+const POSTER_WEBP_QUALITY = 0.82;
 const SUPPORTED_POSTER_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-const POSTER_HELP = "Use a JPG, PNG, or WebP poster smaller than 8 MB.";
+const POSTER_HELP = "Choose a JPG, PNG, or WebP poster up to 25 MB. The Studio compresses it automatically.";
 const STUDIO_DRAFT_KEY = "wills-reel-deal:studio-draft:v1";
 type PublishedReview = {
   id: string;
@@ -119,6 +123,48 @@ function hasDraftContent(draft: StudioDraft) {
   );
 }
 
+function formatPosterBytes(bytes: number) {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+async function optimizePoster(file: File) {
+  const sourceUrl = URL.createObjectURL(file);
+  const image = new Image();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("The selected file could not be decoded as an image."));
+      image.src = sourceUrl;
+    });
+    const scale = Math.min(1, POSTER_MAX_WIDTH / image.naturalWidth, POSTER_MAX_HEIGHT / image.naturalHeight);
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("The browser could not prepare its image compressor.");
+    context.drawImage(image, 0, 0, width, height);
+    const compressedBlob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => blob ? resolve(blob) : reject(new Error("The browser could not create the compressed poster.")),
+        "image/webp",
+        POSTER_WEBP_QUALITY,
+      );
+    });
+    const resized = width !== image.naturalWidth || height !== image.naturalHeight;
+    const shouldUseCompressed = resized || compressedBlob.size < file.size || file.size > MAX_POSTER_BYTES;
+    const baseName = file.name.replace(/\.[^.]+$/, "") || "poster";
+    const optimizedFile = shouldUseCompressed
+      ? new File([compressedBlob], `${baseName}.webp`, { type: "image/webp", lastModified: Date.now() })
+      : file;
+    return { file: optimizedFile, width, height, changed: shouldUseCompressed };
+  } finally {
+    URL.revokeObjectURL(sourceUrl);
+  }
+}
+
 export default function StudioForm() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Movie[]>([]);
@@ -126,6 +172,8 @@ export default function StudioForm() {
   const [searching, setSearching] = useState(false);
   const [posterPreview, setPosterPreview] = useState("");
   const [posterProblem, setPosterProblem] = useState("");
+  const [posterStatus, setPosterStatus] = useState("");
+  const [optimizingPoster, setOptimizingPoster] = useState(false);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [runtime, setRuntime] = useState("");
   const [contentRating, setContentRating] = useState("");
@@ -150,6 +198,8 @@ export default function StudioForm() {
   const [draftStatus, setDraftStatus] = useState("Checking for a saved draft...");
   const formRef = useRef<HTMLFormElement>(null);
   const posterObjectUrl = useRef("");
+  const posterUploadFile = useRef<File | null>(null);
+  const posterSelectionId = useRef(0);
   const movieDetailsController = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -290,53 +340,91 @@ export default function StudioForm() {
     return () => {
       active = false;
       movieDetailsController.current?.abort();
+      posterSelectionId.current += 1;
       if (posterObjectUrl.current) URL.revokeObjectURL(posterObjectUrl.current);
     };
   }, []);
 
-  function posterFileProblem(file: File) {
+  function posterSourceProblem(file: File) {
     if (!SUPPORTED_POSTER_TYPES.has(file.type)) {
       return `${file.name} is not a supported image. ${POSTER_HELP}`;
     }
     if (file.size === 0) return `${file.name} is empty or could not be read. Export a fresh copy and try again.`;
-    if (file.size > MAX_POSTER_BYTES) {
+    if (file.size > MAX_POSTER_SOURCE_BYTES) {
       return `${file.name} is ${(file.size / (1024 * 1024)).toFixed(1)} MB. ${POSTER_HELP}`;
     }
     return "";
   }
 
-  function previewPoster(file?: File) {
+  function posterUploadProblem(file: File) {
+    if (!SUPPORTED_POSTER_TYPES.has(file.type)) return `The optimized poster has an unsupported format. ${POSTER_HELP}`;
+    if (file.size === 0) return "The optimized poster is empty. Choose the image again.";
+    if (file.size > MAX_POSTER_BYTES) return "The poster is still larger than 8 MB after compression. Try a different image.";
+    return "";
+  }
+
+  function resetPoster() {
+    posterSelectionId.current += 1;
     if (posterObjectUrl.current) URL.revokeObjectURL(posterObjectUrl.current);
     posterObjectUrl.current = "";
+    posterUploadFile.current = null;
+    setOptimizingPoster(false);
     setPosterProblem("");
-    if (!file) {
-      setPosterPreview("");
-      return true;
-    }
-    const problem = posterFileProblem(file);
+    setPosterStatus("");
+    setPosterPreview("");
+  }
+
+  async function preparePoster(file?: File) {
+    resetPoster();
+    if (!file) return true;
+    const selectionId = posterSelectionId.current;
+    const problem = posterSourceProblem(file);
     if (problem) {
       setPosterProblem(problem);
-      setPosterPreview("");
       setMessage(problem);
       return false;
     }
+    setOptimizingPoster(true);
+    setPosterStatus("Optimizing poster in your browser...");
+    setMessage("Giving that poster the red-carpet compression treatment...");
     try {
-      posterObjectUrl.current = URL.createObjectURL(file);
-    } catch {
-      const unreadable = `The browser could not open ${file.name}. Export it as a new JPG, PNG, or WebP and try again.`;
+      const optimized = await optimizePoster(file);
+      if (posterSelectionId.current !== selectionId) return true;
+      const uploadProblem = posterUploadProblem(optimized.file);
+      if (uploadProblem) throw new Error(uploadProblem);
+      posterUploadFile.current = optimized.file;
+      posterObjectUrl.current = URL.createObjectURL(optimized.file);
+      setPosterPreview(posterObjectUrl.current);
+      const originalSize = formatPosterBytes(file.size);
+      const finalSize = formatPosterBytes(optimized.file.size);
+      const savings = Math.max(0, Math.round((1 - optimized.file.size / file.size) * 100));
+      const dimensions = `${optimized.width} x ${optimized.height}`;
+      const status = optimized.changed && savings
+        ? `Compressed ${originalSize} to ${finalSize} - ${savings}% smaller. ${dimensions} WebP ready to upload.`
+        : optimized.changed
+          ? `Resized and converted to a ${dimensions} WebP. Final size: ${finalSize}.`
+        : `${finalSize} poster was already efficient. ${dimensions} ready to upload.`;
+      setPosterStatus(status);
+      setMessage(status);
+      return true;
+    } catch (error) {
+      if (posterSelectionId.current !== selectionId) return true;
+      const unreadable = error instanceof Error && error.message
+        ? `${error.message} Export ${file.name} as a new JPG, PNG, or WebP and try again.`
+        : `The browser could not open ${file.name}. Export it as a new JPG, PNG, or WebP and try again.`;
+      setPosterStatus("");
       setPosterProblem(unreadable);
-      setPosterPreview("");
       setMessage(unreadable);
       return false;
+    } finally {
+      if (posterSelectionId.current === selectionId) setOptimizingPoster(false);
     }
-    setPosterPreview(posterObjectUrl.current);
-    return true;
   }
 
   function clearEditor(nextMessage = "") {
     movieDetailsController.current?.abort();
     formRef.current?.reset();
-    previewPoster();
+    resetPoster();
     setEditingId("");
     setQuery("");
     setSelected(null);
@@ -367,8 +455,7 @@ export default function StudioForm() {
 
   function editReview(review: PublishedReview) {
     formRef.current?.reset();
-    if (posterObjectUrl.current) URL.revokeObjectURL(posterObjectUrl.current);
-    posterObjectUrl.current = "";
+    resetPoster();
     setEditingId(review.id);
     setSelected({ id: review.movieId, title: review.title, year: review.year, runtime: review.runtime, contentRating: review.contentRating });
     setQuery(review.title);
@@ -389,6 +476,7 @@ export default function StudioForm() {
     setAppleUrl(review.appleUrl ?? "");
     setPosterPreview(review.poster);
     setPosterProblem("");
+    setPosterStatus("Current published poster. Choose another image to replace it.");
     setMessage(`Editing ${review.title}. The current poster stays unless you choose a new one.`);
     window.setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   }
@@ -451,14 +539,17 @@ export default function StudioForm() {
       setMessage("Select the movie from search first.");
       return;
     }
-    const posterInput = event.currentTarget.elements.namedItem("poster") as HTMLInputElement | null;
-    const poster = posterInput?.files?.[0];
+    if (optimizingPoster) {
+      setMessage("The poster is still being optimized. Give it one more moment.");
+      return;
+    }
+    const poster = posterUploadFile.current;
     if (!editingId && !poster) {
       setMessage("Upload one poster image before publishing.");
       return;
     }
     if (poster) {
-      const problem = posterFileProblem(poster);
+      const problem = posterUploadProblem(poster);
       if (problem) {
         setPosterProblem(problem);
         setMessage(problem);
@@ -477,6 +568,8 @@ export default function StudioForm() {
     form.set("rewatchOdds", rewatchOdds);
     form.set("watchParty", formatWatchParties(watchParties));
     form.set("sleepRisk", sleepRisk);
+    if (poster) form.set("poster", poster, poster.name);
+    else form.delete("poster");
     if (editingId) form.set("reviewId", editingId);
 
     try {
@@ -497,11 +590,12 @@ export default function StudioForm() {
       }
       if (!response.ok) throw new Error(data.error ?? (editingId ? "Saving failed." : "Publishing failed."));
       const savedTitle = selected.title;
-      if (data.review) {
+      const savedReview = data.review;
+      if (savedReview) {
         setReviews((current) => (
           editingId
-            ? current.map((review) => review.id === editingId ? data.review : review)
-            : [data.review, ...current]
+            ? current.map((review) => review.id === editingId ? savedReview : review)
+            : [savedReview, ...current]
         ));
       }
       clearEditor(editingId
@@ -781,7 +875,7 @@ export default function StudioForm() {
                   setMessage(unreadable);
                 }}
               />
-            ) : <><strong>Drop in the poster</strong><span>JPG, PNG, or WebP under 8 MB</span><i>Choose image</i></>}
+            ) : <><strong>Drop in the poster</strong><span>JPG, PNG, or WebP up to 25 MB</span><i>Choose image</i></>}
           </label>
           <input
             className="poster-input"
@@ -790,18 +884,22 @@ export default function StudioForm() {
             type="file"
             accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
             onChange={(event) => {
-              if (!previewPoster(event.target.files?.[0])) event.currentTarget.value = "";
+              const input = event.currentTarget;
+              void preparePoster(input.files?.[0]).then((ready) => {
+                if (!ready) input.value = "";
+              });
             }}
             required={!editingId}
           />
+          {posterStatus && <p className={`studio-field-note ${posterProblem ? "studio-field-note--error" : "studio-field-note--success"}`} aria-live="polite">{posterStatus}</p>}
           {posterProblem && <p className="studio-field-note studio-field-note--error" role="alert">{posterProblem}</p>}
         </div>
 
         <div className="studio-submit">
           <p aria-live="polite">{message || "Publishing makes the review visible on the homepage immediately."}</p>
           {editingId && <button className="studio-cancel-edit" type="button" onClick={() => clearEditor("No changes made.")}>Cancel</button>}
-          <button className="button button--lime" type="submit" disabled={publishing || !selected || selectedGenres.length === 0 || !runtime || Boolean(posterProblem)}>
-            {publishing ? "Saving..." : editingId ? "Save the tune-up" : "Publish the take"}<span>↗</span>
+          <button className="button button--lime" type="submit" disabled={publishing || optimizingPoster || !selected || selectedGenres.length === 0 || !runtime || Boolean(posterProblem)}>
+            {optimizingPoster ? "Optimizing poster..." : publishing ? "Saving..." : editingId ? "Save the tune-up" : "Publish the take"}<span>↗</span>
           </button>
         </div>
       </form>
